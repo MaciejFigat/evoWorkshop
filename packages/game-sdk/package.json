@@ -1,0 +1,16 @@
+{
+  "name": "@evo/game-sdk",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@evo/protocol": "workspace:*",
+    "@evo/rng": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript7": "npm:typescript@^7.0.2"
+  }
+}

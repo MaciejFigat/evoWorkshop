@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__TITLE__</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101116;
+        --surface: #1b1d25;
+        --surface-2: #242731;
+        --line: #31343f;
+        --line-strong: #434757;
+        --ink: #f1f2f5;
+        --muted: #8f93a2;
+        --gold: #e9b949;
+        --gold-ink: #1b1608;
+        --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        background: radial-gradient(120% 80% at 50% 0%, #1c1f2a 0%, var(--bg) 60%);
+        color: var(--ink);
+        font: 14px/1.4 var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      .hud-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 20px;
+      }
+      .hud-top .title {
+        font-weight: 700;
+        font-size: 15px;
+        margin-right: auto;
+      }
+      #status {
+        color: var(--muted);
+        font: 12px var(--mono);
+      }
+      .stage {
+        display: grid;
+        justify-items: center;
+        align-content: center;
+        gap: 18px;
+      }
+      .outcome {
+        width: 140px;
+        height: 140px;
+        display: grid;
+        place-items: center;
+        border-radius: 16px;
+        background: linear-gradient(160deg, #2b2e3a 0%, #1a1c24 60%, #121319 100%);
+        border: 1px solid var(--line-strong);
+        font-weight: 800;
+        font-size: 56px;
+      }
+      #result {
+        min-height: 1.5em;
+        color: var(--muted);
+      }
+      .hud {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 12px 20px;
+        background: var(--surface);
+        border-top: 1px solid var(--line);
+      }
+      .totals {
+        display: flex;
+        gap: 28px;
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .totals div {
+        display: grid;
+        gap: 2px;
+      }
+      .totals b {
+        font-size: 16px;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--gold);
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+      }
+      input {
+        width: 88px;
+        font: 14px var(--mono);
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 7px 9px;
+      }
+      button {
+        font: inherit;
+        min-width: 120px;
+        height: 44px;
+        border-radius: 999px;
+        border: 0;
+        background: var(--gold);
+        color: var(--gold-ink);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hud-top">
+      <div class="title">__TITLE__</div>
+      <div id="status">Waiting for host:init</div>
+    </header>
+
+    <main class="stage">
+      <div id="outcome" class="outcome">?</div>
+      <div id="result"></div>
+    </main>
+
+    <footer class="hud">
+      <label>Stake <input id="stake" type="number" min="0" step="10" value="10" /></label>
+      <button id="play" type="button" disabled>Play</button>
+      <div class="totals">
+        <div><span>Balance</span><b id="balance">1000</b></div>
+      </div>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

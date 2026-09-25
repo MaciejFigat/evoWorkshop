@@ -1,0 +1,9 @@
+{
+  "id": "d20",
+  "version": "0.1.0",
+  "title": "Lightning d20",
+  "description": "One d20 roll for the whole table. Bets on a number, even/odd and DC ≥ 15. Core: single weighted draw.",
+  "cover": "cover.svg",
+  "entry": "index.html",
+  "core": "draw"
+}

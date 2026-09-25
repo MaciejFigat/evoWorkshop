@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightning d20</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101116;
+        --surface: #1b1d25;
+        --surface-2: #242731;
+        --line: #31343f;
+        --line-strong: #434757;
+        --ink: #f1f2f5;
+        --muted: #8f93a2;
+        --gold: #e9b949;
+        --gold-deep: #b8892a;
+        --gold-ink: #1b1608;
+        --green: #4fc07a;
+        --danger: #e0655a;
+        --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        background: radial-gradient(120% 80% at 50% 0%, #1c1f2a 0%, var(--bg) 60%);
+        color: var(--ink);
+        font: 14px/1.4 var(--sans);
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+      }
+      button {
+        font: inherit;
+        color: var(--ink);
+        background: var(--surface-2);
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 8px 14px;
+        cursor: pointer;
+        transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+      }
+      button:hover:not(:disabled) {
+        background: #2d3040;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+      }
+
+      /* ---------- top hud ---------- */
+      .hud-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 20px;
+        font-size: 13px;
+      }
+      .hud-top .title {
+        font-weight: 700;
+        font-size: 15px;
+        margin-right: auto;
+      }
+      .status {
+        color: var(--muted);
+        font: 12px var(--mono);
+      }
+
+      /* ---------- table ---------- */
+      .table {
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) minmax(360px, 560px);
+        gap: 24px;
+        align-items: center;
+        padding: 8px 24px 16px;
+        max-width: 1100px;
+        width: 100%;
+        margin: 0 auto;
+        min-height: 0;
+      }
+      .stage {
+        display: grid;
+        justify-items: center;
+        gap: 18px;
+      }
+      .die-wrap {
+        width: 200px;
+        height: 200px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: radial-gradient(circle, #22252f 0%, transparent 70%);
+        filter: drop-shadow(0 18px 22px rgb(0 0 0 / 55%));
+      }
+      .die {
+        width: 150px;
+        height: 150px;
+        display: grid;
+        place-items: center;
+        clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+        background: linear-gradient(160deg, #3a3e4c 0%, #1e2029 55%, #14151b 100%);
+        position: relative;
+        transition: transform 180ms ease;
+      }
+      .die::before {
+        content: '';
+        position: absolute;
+        inset: 3px;
+        clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+        background: linear-gradient(160deg, #2b2e3a 0%, #1a1c24 60%, #121319 100%);
+      }
+      .die::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(30deg, transparent 49.4%, rgb(255 255 255 / 7%) 49.6%, rgb(255 255 255 / 7%) 50.4%, transparent 50.6%),
+          linear-gradient(150deg, transparent 49.4%, rgb(255 255 255 / 7%) 49.6%, rgb(255 255 255 / 7%) 50.4%, transparent 50.6%),
+          linear-gradient(90deg, transparent 49.4%, rgb(255 255 255 / 7%) 49.6%, rgb(255 255 255 / 7%) 50.4%, transparent 50.6%);
+        pointer-events: none;
+      }
+      .die-face {
+        position: relative;
+        z-index: 1;
+        font-weight: 800;
+        font-size: 60px;
+        letter-spacing: -0.03em;
+        color: var(--ink);
+        text-shadow: 0 2px 0 rgb(0 0 0 / 40%);
+      }
+      .die.rolling {
+        animation: tumble 900ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+      }
+      .die.settle {
+        animation: settle 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+      }
+      .die.crit {
+        background: linear-gradient(160deg, #f3cf6a 0%, var(--gold) 45%, var(--gold-deep) 100%);
+      }
+      .die.crit .die-face {
+        color: var(--gold-ink);
+        text-shadow: none;
+      }
+      .die.fumble .die-face {
+        color: var(--danger);
+      }
+      @keyframes tumble {
+        0% {
+          transform: rotate(0deg) scale(1);
+        }
+        30% {
+          transform: rotate(-200deg) scale(0.9) translateY(-18px);
+        }
+        60% {
+          transform: rotate(380deg) scale(1.05) translateY(6px);
+        }
+        100% {
+          transform: rotate(720deg) scale(1);
+        }
+      }
+      @keyframes settle {
+        0% {
+          transform: scale(1.18);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .result {
+        min-height: 1.5em;
+        font-size: 15px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .result b {
+        color: var(--ink);
+      }
+      .result .win {
+        color: var(--gold);
+        font-weight: 700;
+      }
+
+      /* ---------- bet spots ---------- */
+      .spots {
+        display: grid;
+        grid-template-columns: 1fr 190px;
+        gap: 12px;
+      }
+      .spot {
+        position: relative;
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        padding: 12px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        text-align: left;
+        transition: border-color 120ms ease, background-color 120ms ease;
+      }
+      .spot.clickable:hover {
+        border-color: var(--line-strong);
+        background: #20222b;
+      }
+      .spot.has-bet {
+        border-color: var(--gold-deep);
+      }
+      .spot.won {
+        border-color: var(--gold);
+        box-shadow: 0 0 0 1px var(--gold) inset;
+      }
+      .spot-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-weight: 600;
+      }
+      .pays {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .spot-col {
+        display: grid;
+        grid-template-rows: 1fr 1fr 1fr;
+        gap: 12px;
+      }
+      .spot-col .spot {
+        align-content: center;
+        min-height: 72px;
+      }
+      .numbers {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+      }
+      .num {
+        padding: 0;
+        height: 44px;
+        font-weight: 600;
+        font-size: 15px;
+        background: var(--surface-2);
+        border-color: transparent;
+      }
+      .num.selected {
+        background: var(--ink);
+        color: var(--bg);
+      }
+      .num.hit {
+        background: var(--gold);
+        color: var(--gold-ink);
+      }
+      .spot-head .name {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+      }
+      .stack {
+        display: none;
+        min-width: 26px;
+        height: 22px;
+        padding: 0 7px;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--gold);
+        color: var(--gold-ink);
+        font-weight: 700;
+        font-size: 11px;
+        box-shadow: 0 1px 0 var(--gold-deep);
+      }
+      .stack.on {
+        display: inline-grid;
+        animation: pop 160ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+      }
+      @keyframes pop {
+        0% {
+          transform: scale(0.4);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      /* ---------- bottom hud ---------- */
+      .hud {
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        align-items: center;
+        gap: 20px;
+        padding: 12px 20px;
+        background: var(--surface);
+        border-top: 1px solid var(--line);
+      }
+      .chips {
+        display: flex;
+        gap: 8px;
+      }
+      .chip {
+        width: 46px;
+        height: 46px;
+        padding: 0;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 50% 50%, var(--surface-2) 0 58%, transparent 59%),
+          repeating-conic-gradient(var(--ink) 0 12deg, var(--surface-2) 12deg 45deg);
+        border: 2px solid var(--line-strong);
+        transition: transform 120ms ease, border-color 120ms ease;
+      }
+      .chip:hover:not(:disabled) {
+        transform: translateY(-2px);
+        background:
+          radial-gradient(circle at 50% 50%, var(--surface-2) 0 58%, transparent 59%),
+          repeating-conic-gradient(var(--ink) 0 12deg, var(--surface-2) 12deg 45deg);
+      }
+      .chip.selected {
+        border-color: var(--gold);
+        color: var(--gold-ink);
+        background:
+          radial-gradient(circle at 50% 50%, var(--gold) 0 58%, transparent 59%),
+          repeating-conic-gradient(var(--gold-ink) 0 12deg, var(--gold) 12deg 45deg);
+        transform: translateY(-3px);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      .totals {
+        display: flex;
+        justify-content: flex-end;
+        gap: 28px;
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .totals div {
+        display: grid;
+        gap: 2px;
+      }
+      .totals b {
+        font-size: 16px;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      .totals .money {
+        color: var(--gold);
+      }
+      .roll {
+        min-width: 140px;
+        height: 48px;
+        border-radius: 999px;
+        border: 0;
+        background: var(--gold);
+        color: var(--gold-ink);
+        font-weight: 800;
+        font-size: 15px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .roll:hover:not(:disabled) {
+        background: #f1c65b;
+      }
+      @media (max-width: 760px) {
+        .table {
+          grid-template-columns: 1fr;
+        }
+        .hud {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hud-top">
+      <div class="title">Lightning d20</div>
+      <div id="status" class="status">Waiting for host:init</div>
+    </header>
+
+    <main class="table">
+      <section class="stage">
+        <div class="die-wrap">
+          <div id="die" class="die"><span id="dieFace" class="die-face">?</span></div>
+        </div>
+        <div id="result" class="result">Pick a chip and place it on a spot.</div>
+      </section>
+
+      <section class="spots">
+        <div id="spotNumber" class="spot">
+          <div class="spot-head">
+            <span class="name">Number <span id="stackStraight" class="stack"></span></span>
+            <span class="pays">pays 18×</span>
+          </div>
+          <div id="numbers" class="numbers"></div>
+        </div>
+        <div class="spot-col">
+          <button id="spotEven" type="button" class="spot clickable">
+            <div class="spot-head">
+              <span class="name">Even <span id="stackEven" class="stack"></span></span>
+              <span class="pays">pays 1.9×</span>
+            </div>
+          </button>
+          <button id="spotOdd" type="button" class="spot clickable">
+            <div class="spot-head">
+              <span class="name">Odd <span id="stackOdd" class="stack"></span></span>
+              <span class="pays">pays 1.9×</span>
+            </div>
+          </button>
+          <button id="spotDc" type="button" class="spot clickable">
+            <div class="spot-head">
+              <span class="name">15+ <span id="stackDc" class="stack"></span></span>
+              <span class="pays">pays 3×</span>
+            </div>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="hud">
+      <div id="chips" class="chips"></div>
+      <div class="actions">
+        <button id="undo" type="button" disabled>Undo</button>
+        <button id="clear" type="button" disabled>Clear</button>
+      </div>
+      <div class="totals">
+        <div><span>Balance</span><b id="balance" class="money">1000</b></div>
+        <div><span>Total bet</span><b id="totalBet">0</b></div>
+        <div><span>Last win</span><b id="lastWin">0</b></div>
+      </div>
+      <button id="roll" type="button" class="roll" disabled>Roll</button>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
