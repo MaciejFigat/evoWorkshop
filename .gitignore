@@ -4,3 +4,5 @@ dist
 .yarn/*
 !.yarn/releases
 .pnp.*
+.env
+.env.local
