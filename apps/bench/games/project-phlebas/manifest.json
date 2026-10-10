@@ -1,0 +1,8 @@
+{
+  "id": "project-phlebas",
+  "version": "0.1.0",
+  "title": "Project Phlebas",
+  "description": "A CS-history space shooter: weapons and enemies are computer science concepts, from logic gates to attention mechanisms. Feel experiment, no core — see docs/passports/project-phlebas.md.",
+  "cover": "cover.svg",
+  "entry": "index.html"
+}

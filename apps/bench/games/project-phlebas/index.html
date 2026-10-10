@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project Phlebas</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        background: #000;
+        color: #fff;
+        font: 14px/1.4 var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      .hud-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 16px;
+        border-bottom: 1px solid #333;
+      }
+      .hud-top .title {
+        font-weight: 700;
+        font-size: 14px;
+        margin-right: auto;
+      }
+      #status {
+        color: #888;
+        font: 11px var(--mono);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr 200px;
+        min-height: 0;
+      }
+      .stage {
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-height: 0;
+      }
+      .devpanel {
+        border-left: 1px solid #333;
+        padding: 16px 14px;
+        display: grid;
+        align-content: start;
+        gap: 20px;
+        font: 12px var(--mono);
+      }
+      .devpanel h2 {
+        margin: 0;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #888;
+      }
+      .devpanel .group {
+        display: grid;
+        gap: 8px;
+      }
+      .devpanel .label {
+        color: #888;
+      }
+      .devpanel .btnrow {
+        display: flex;
+        gap: 6px;
+      }
+      .devpanel button {
+        flex: 1;
+        font: inherit;
+        padding: 6px 4px;
+        background: transparent;
+        color: #fff;
+        border: 1px solid #444;
+        cursor: pointer;
+      }
+      .devpanel button.active {
+        background: #fff;
+        color: #000;
+        border-color: #fff;
+      }
+      .devpanel button:hover {
+        border-color: #888;
+      }
+      .devpanel label.checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #ccc;
+        cursor: pointer;
+      }
+      #board {
+        background: #000;
+        border: 1px solid #333;
+        image-rendering: pixelated;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgb(0 0 0 / 85%);
+        text-align: center;
+        padding: 24px;
+      }
+      .overlay.visible {
+        display: grid;
+      }
+      .overlay-card {
+        max-width: 360px;
+        border: 1px solid #fff;
+        padding: 20px 22px;
+      }
+      .overlay-card h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .overlay-card p {
+        margin: 0 0 8px;
+        color: #ccc;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .overlay-card .hint {
+        margin-top: 14px;
+        color: #888;
+        font: 11px var(--mono);
+      }
+      .hud {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 10px 16px;
+        border-top: 1px solid #333;
+        font: 12px var(--mono);
+        color: #ccc;
+      }
+      .hud b {
+        color: #fff;
+      }
+      .hud .spacer {
+        margin-left: auto;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hud-top">
+      <div class="title">Project Phlebas</div>
+      <div id="status">Waiting for host:init</div>
+    </header>
+
+    <main class="layout">
+      <div class="stage">
+        <canvas id="board" width="480" height="640"></canvas>
+        <div id="overlay" class="overlay">
+          <div class="overlay-card">
+            <h2 id="overlayTitle">Paused</h2>
+            <p id="overlayWeapon"></p>
+            <p id="overlayEnemy"></p>
+            <div class="hint">Press P to resume</div>
+          </div>
+        </div>
+      </div>
+      <aside class="devpanel">
+        <h2>Dev controls</h2>
+        <div class="group">
+          <span class="label">Tempo</span>
+          <div class="btnrow">
+            <button type="button" id="speedSlow">Slow</button>
+            <button type="button" id="speedNormal" class="active">Normal</button>
+            <button type="button" id="speedFast">Fast</button>
+          </div>
+        </div>
+        <div class="group">
+          <label class="checkbox"><input type="checkbox" id="stayInEra" /> Stay in era</label>
+        </div>
+        <div class="group">
+          <span class="label">Era</span>
+          <div class="btnrow">
+            <button type="button" id="eraPrev">◀ Prev</button>
+            <button type="button" id="eraNext">Next ▶</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="hud">
+      <div>Score <b id="score">0</b></div>
+      <div>Lives <b id="lives">3</b></div>
+      <div>Era <b id="era">—</b></div>
+      <div class="spacer">Arrows/A-D move · Space fire · P pause</div>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
