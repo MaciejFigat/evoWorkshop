@@ -1,0 +1,173 @@
+:root {
+  --bg: #14110f;
+  --panel: #1d1a17;
+  --line: #4a4038;
+  --ink: #e8dcc4;
+  --muted: #9a8f7e;
+  --gold: #c9a227;
+  --burn: #d0342c;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.4 Georgia, serif;
+}
+
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: normal;
+}
+
+h1 {
+  font-size: 22px;
+  color: var(--gold);
+}
+
+h2 {
+  font-size: 17px;
+  margin-bottom: 10px;
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  border: 1px solid var(--burn);
+  color: var(--burn);
+  padding: 6px 10px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 14px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+}
+
+button {
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.name-form {
+  max-width: 360px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.name-form h2 {
+  width: 100%;
+}
+
+.lobby {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.lobby .panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobby .panel h2 {
+  width: 100%;
+}
+
+.lobby .wide {
+  grid-column: 1 / -1;
+  display: block;
+}
+
+.tables {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tables li {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.table-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.table-bar .spacer {
+  flex: 1;
+}
+
+.clock {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.board {
+  width: 100%;
+  aspect-ratio: 960 / 600;
+  border: 1px solid var(--line);
+}
+
+.hud {
+  min-height: 96px;
+  padding-top: 8px;
+}
+
+.prompt {
+  margin: 0 0 8px;
+}
+
+.bets {
+  display: flex;
+  gap: 8px;
+}

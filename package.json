@@ -1,13 +1,15 @@
 {
-  "name": "evo-workshop",
+  "name": "evo-playground",
   "private": true,
   "packageManager": "yarn@4.17.0",
   "workspaces": [
     "apps/*",
+    "apps/alchemy-brawl/*",
     "packages/*"
   ],
   "scripts": {
     "dev": "yarn workspace bench dev",
+    "brawl": "yarn workspaces foreach -A -piv --include '@evo/brawl-*' run dev",
     "typecheck": "yarn workspaces foreach -A --topological run typecheck",
     "test": "yarn workspaces foreach -A --topological run test",
     "build": "yarn workspaces foreach -A --topological run build",

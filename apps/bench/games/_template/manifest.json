@@ -2,7 +2,7 @@
   "id": "__ID__",
   "version": "0.1.0",
   "title": "__TITLE__",
-  "description": "Describe the mechanic in one sentence and name its core.",
+  "description": "Describe the game or mechanic in one sentence; name its core if it has one.",
   "cover": "cover.svg",
   "entry": "index.html",
   "core": "draw"

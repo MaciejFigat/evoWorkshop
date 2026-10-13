@@ -43,7 +43,7 @@ export function App() {
     <>
       <header className="topbar">
         <div className="wordmark">
-          evo<span>workshop</span>
+          evo<span>playground</span>
         </div>
         <nav className="tabs">
           <button type="button" className={view.kind === 'gallery' ? 'active' : 'ghost'} onClick={() => setView({ kind: 'gallery' })}>

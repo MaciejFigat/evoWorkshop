@@ -5,6 +5,51 @@ __metadata:
   version: 10
   cacheKey: 10c0
 
+"@evo/brawl-client@workspace:apps/alchemy-brawl/client":
+  version: 0.0.0-use.local
+  resolution: "@evo/brawl-client@workspace:apps/alchemy-brawl/client"
+  dependencies:
+    "@evo/brawl-shared": "workspace:*"
+    "@evo/game-sdk": "workspace:*"
+    "@types/react": "npm:^19.3.0"
+    "@types/react-dom": "npm:^19.3.0"
+    "@vitejs/plugin-react": "npm:^6.1.1"
+    phaser: "npm:^4.2.1"
+    react: "npm:^19.3.0"
+    react-dom: "npm:^19.3.0"
+    typescript7: "npm:typescript@^7.0.2"
+    vite: "npm:^8.3.0"
+  languageName: unknown
+  linkType: soft
+
+"@evo/brawl-server@workspace:apps/alchemy-brawl/server":
+  version: 0.0.0-use.local
+  resolution: "@evo/brawl-server@workspace:apps/alchemy-brawl/server"
+  dependencies:
+    "@evo/brawl-shared": "workspace:*"
+    "@evo/rng": "workspace:*"
+    "@types/node": "npm:^22.0.0"
+    "@types/ws": "npm:^8.18.2"
+    typescript7: "npm:typescript@^7.0.2"
+    vite: "npm:^8.3.0"
+    vitest: "npm:^5.0.1"
+    ws: "npm:^8.22.0"
+  languageName: unknown
+  linkType: soft
+
+"@evo/brawl-shared@workspace:*, @evo/brawl-shared@workspace:apps/alchemy-brawl/shared":
+  version: 0.0.0-use.local
+  resolution: "@evo/brawl-shared@workspace:apps/alchemy-brawl/shared"
+  dependencies:
+    "@evo/protocol": "workspace:*"
+    "@evo/rng": "workspace:*"
+    typescript7: "npm:typescript@^7.0.2"
+    vite: "npm:^8.3.0"
+    vitest: "npm:^5.0.1"
+    zod: "npm:^4.6.5"
+  languageName: unknown
+  linkType: soft
+
 "@evo/game-sdk@workspace:*, @evo/game-sdk@workspace:packages/game-sdk":
   version: 0.0.0-use.local
   resolution: "@evo/game-sdk@workspace:packages/game-sdk"
@@ -212,6 +257,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/node@npm:*":
+  version: 26.6.5
+  resolution: "@types/node@npm:26.6.5"
+  dependencies:
+    undici-types: "npm:~8.9.0"
+  checksum: 10c0/4f791f69466ace7842c09e7bef96cb1ddbb65cf3db916ef7e84f0e2b2a17220b6b816dc7539d01520cadfb17ed7169b8214910900493e0a83be8bc7d124ec20a
+  languageName: node
+  linkType: hard
+
 "@types/node@npm:^22.0.0":
   version: 22.20.4
   resolution: "@types/node@npm:22.20.4"
@@ -236,6 +290,15 @@ __metadata:
   dependencies:
     csstype: "npm:^3.2.2"
   checksum: 10c0/fbcabf303f935ca9f36ed2dcf81751cf84744098c5a683c8a62a0fa7edd31714b48d5c46b12fd0014f7f2dfe4d9ec6de428a850748eec719a70294e51029551b
+  languageName: node
+  linkType: hard
+
+"@types/ws@npm:^8.18.2":
+  version: 8.18.2
+  resolution: "@types/ws@npm:8.18.2"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10c0/8cf79499d26df06ffc27109fc86f1400371a5932082a4c1269be3f11e22b9e5a403a4ba2c1a3245d5fae420c270571aa833142a3d7fdce8f6cd24a45c52a98e4
   languageName: node
   linkType: hard
 
@@ -511,9 +574,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"evo-workshop@workspace:.":
+"eventemitter3@npm:^5.0.4":
+  version: 5.0.4
+  resolution: "eventemitter3@npm:5.0.4"
+  checksum: 10c0/575b8cac8d709e1473da46f8f15ef311b57ff7609445a7c71af5cd42598583eee6f098fa7a593e30f27e94b8865642baa0689e8fa97c016f742abdb3b1bf6d9a
+  languageName: node
+  linkType: hard
+
+"evo-playground@workspace:.":
   version: 0.0.0-use.local
-  resolution: "evo-workshop@workspace:."
+  resolution: "evo-playground@workspace:."
   languageName: unknown
   linkType: soft
 
@@ -765,6 +835,15 @@ __metadata:
   version: 2.2.1
   resolution: "obug@npm:2.2.1"
   checksum: 10c0/8a7c001847d880fa6ba83c7bbee6a80fd271ee628439cd508c8647d53b217abb1759e2d5e4aaeb09a35d0a274bdb225a0a5a78eded3213d63e656153cf411b63
+  languageName: node
+  linkType: hard
+
+"phaser@npm:^4.2.1":
+  version: 4.2.1
+  resolution: "phaser@npm:4.2.1"
+  dependencies:
+    eventemitter3: "npm:^5.0.4"
+  checksum: 10c0/3fa1b0600d7287b64af2ebc9d5874b3fdd82d2036c911feacf9b8e589e8375c91326f7a23e5fc5555250c68778ad822e27c0e82a2716099b07279b90b65e59d0
   languageName: node
   linkType: hard
 
@@ -1035,6 +1114,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"undici-types@npm:~8.9.0":
+  version: 8.9.0
+  resolution: "undici-types@npm:8.9.0"
+  checksum: 10c0/51c712c20c087368f62c6fc0f2bc49fa76bfe5dec28ff01584bb677ff29b0622569783c02d43e151143808c48c0503f804093bd2c491b10f2a830138034cb451
+  languageName: node
+  linkType: hard
+
 "undici@npm:^8.4.1":
   version: 8.11.2
   resolution: "undici@npm:8.11.2"
@@ -1180,6 +1266,21 @@ __metadata:
   bin:
     why-is-node-running: cli.js
   checksum: 10c0/1cde0b01b827d2cf4cb11db962f3958b9175d5d9e7ac7361d1a7b0e2dc6069a263e69118bd974c4f6d0a890ef4eedfe34cf3d5167ec14203dbc9a18620537054
+  languageName: node
+  linkType: hard
+
+"ws@npm:^8.22.0":
+  version: 8.22.0
+  resolution: "ws@npm:8.22.0"
+  peerDependencies:
+    bufferutil: ^4.0.1
+    utf-8-validate: ">=5.0.2"
+  peerDependenciesMeta:
+    bufferutil:
+      optional: true
+    utf-8-validate:
+      optional: true
+  checksum: 10c0/7304d14ef38898dd366a528a85e2da389c4eebf30f4ce8a007bd2dce6025f9b619cefe44fe2354f0bad0ec541b1c9a4da06a3f3e046ab56f01fd52d5784ecfb2
   languageName: node
   linkType: hard
 
