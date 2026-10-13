@@ -107,6 +107,17 @@ input:focus-visible {
   color: var(--gold);
 }
 
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tabs button.active {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
 .shell {
   max-width: 1360px;
   margin: 0 auto;
@@ -293,6 +304,48 @@ input:focus-visible {
 
 .empty code {
   color: var(--ink);
+}
+
+.idea-form {
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.idea-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.idea-form input,
+.idea-form textarea {
+  font: 14px/1.4 var(--sans);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+
+.idea-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.idea-status {
+  font-size: 13px;
+}
+
+.idea-status.ok {
+  color: var(--green);
+}
+
+.idea-status.err {
+  color: var(--danger);
 }
 
 .player {

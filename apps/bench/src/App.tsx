@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Gallery } from './Gallery';
+import { Ideas } from './Ideas';
 import { Player } from './Player';
 import { localGames } from './localGames';
 import { loadExternalGames, resolveLocalGames, type GameEntry, type LoadResult } from './registry';
 import external from '../games.external.json';
 
-type View = { kind: 'gallery' } | { kind: 'player'; game: GameEntry };
+type View = { kind: 'gallery' } | { kind: 'ideas' } | { kind: 'player'; game: GameEntry };
 type Catalog = { status: 'loading' } | { status: 'ready'; result: LoadResult };
 
 const EXTERNAL_REGISTRY = 'games.external.json';
@@ -44,9 +45,19 @@ export function App() {
         <div className="wordmark">
           evo<span>playground</span>
         </div>
+        <nav className="tabs">
+          <button type="button" className={view.kind === 'gallery' ? 'active' : 'ghost'} onClick={() => setView({ kind: 'gallery' })}>
+            Gallery
+          </button>
+          <button type="button" className={view.kind === 'ideas' ? 'active' : 'ghost'} onClick={() => setView({ kind: 'ideas' })}>
+            Ideas
+          </button>
+        </nav>
       </header>
       <main className="shell">
-        {catalog.status === 'loading' ? (
+        {view.kind === 'ideas' ? (
+          <Ideas />
+        ) : catalog.status === 'loading' ? (
           <p className="muted">Loading games…</p>
         ) : (
           <Gallery result={catalog.result} onOpen={(game) => setView({ kind: 'player', game })} />
