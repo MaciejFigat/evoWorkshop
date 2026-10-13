@@ -1,4 +1,4 @@
-# evo-workshop
+# evo-playground
 
 Workshop for game ideas the company can use: arcade mechanics to embed into live casino
 games and slots, and complete games that stand as products of their own. A folder per game →

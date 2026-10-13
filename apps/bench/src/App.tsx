@@ -42,7 +42,7 @@ export function App() {
     <>
       <header className="topbar">
         <div className="wordmark">
-          evo<span>workshop</span>
+          evo<span>playground</span>
         </div>
       </header>
       <main className="shell">

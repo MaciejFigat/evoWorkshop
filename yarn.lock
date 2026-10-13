@@ -581,9 +581,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"evo-workshop@workspace:.":
+"evo-playground@workspace:.":
   version: 0.0.0-use.local
-  resolution: "evo-workshop@workspace:."
+  resolution: "evo-playground@workspace:."
   languageName: unknown
   linkType: soft
 

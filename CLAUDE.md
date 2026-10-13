@@ -2,7 +2,7 @@
 
 ## Why this repository exists
 
-A workshop for game ideas the company can use. An idea comes in one of two kinds:
+A playground for game ideas the company can use. An idea comes in one of two kinds:
 
 - **Mechanic**: an arcade mechanic to embed into a live casino game or a slot, whole or as a
   bonus feature. It maps onto one of the eight math cores (below) or is explicitly marked as
