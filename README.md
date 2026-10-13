@@ -1,7 +1,9 @@
 # evo-workshop
 
-Test bench for mini-game mechanics: a folder per game → card in the gallery → iframe →
-event log. See `CLAUDE.md` for why the bench exists and what a game must satisfy.
+Workshop for game ideas the company can use: arcade mechanics to embed into live casino
+games and slots, and complete games that stand as products of their own. A folder per game →
+card in the gallery → iframe → event log. See `CLAUDE.md` for why the bench exists and what a
+game must satisfy.
 
 ## Run
 
@@ -12,6 +14,7 @@ yarn typecheck
 yarn test
 yarn build
 yarn new-game <id> [Title words...]
+yarn brawl          # Alchemy Brawl: server ws://localhost:5191/ws + client http://localhost:5190
 ```
 
 ## Layout
@@ -27,8 +30,20 @@ apps/bench/                 React + Vite host: gallery, player, event log
 packages/protocol/          zod schemas: manifest, registry, host↔game messages
 packages/rng/               mulberry32 → { next, int, shuffle }; the only place Math.random may appear
 packages/game-sdk/          connect(onInit): handshake with the host, seed → rng, emit()
+apps/alchemy-brawl/         multiplayer game with its own server, three workspaces:
+  shared/                   pure hand engine, scoring, per-seat view, zod protocol
+  server/                   Node + ws: lobby, tables by 4-letter code, timers, bots
+  client/                   Vite + React lobby and HUD, Phaser table
 scripts/new-game.mjs        scaffolds a game from the template
 ```
+
+## Alchemy Brawl
+
+`yarn brawl` starts the server and the client together; open http://localhost:5190, enter a
+name, create a table or join one by its code, and add bots to fill the seats. Each browser
+tab is a separate player, and a reload keeps the seat. Rules: `alchemy_brawl_spec.md`;
+passport: `docs/passports/alchemy-brawl.md`. The prototype plays money only, and stacks are
+topped up before every hand, so nobody goes all-in and there are no side pots.
 
 ## Adding a game
 
@@ -81,7 +96,8 @@ seed 1 and a no-op `emit`, so a game also runs standalone.
 ```
 
 `core` is optional and takes one of: `ladder`, `mines`, `pick`, `draw`, `cascade`,
-`race`, `board`, `collect`. `id` is `[a-z0-9-]` only and must equal the folder name.
+`race`, `board`, `collect`; a complete game that maps onto no core omits it. `id` is
+`[a-z0-9-]` only and must equal the folder name.
 
 Messages go over `postMessage`, protocol 1 (`PROTOCOL_VERSION` in `@evo/protocol`):
 

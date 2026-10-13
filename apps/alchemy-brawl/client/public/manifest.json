@@ -1,0 +1,8 @@
+{
+  "id": "alchemy-brawl",
+  "version": "0.1.0",
+  "title": "Alchemy Brawl",
+  "description": "Multiplayer table game: simultaneous casts, collisions burn equal powers, fixed-limit betting for the pot.",
+  "cover": "cover.svg",
+  "entry": "index.html"
+}

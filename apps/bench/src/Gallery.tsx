@@ -18,7 +18,7 @@ export function Gallery({ result, onOpen }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const countOf = (core: Core) => result.games.filter((g) => g.manifest.core === core).length;
   const shown = filter === 'all' ? result.games : result.games.filter((g) => g.manifest.core === filter);
-  const activeLabel = filter === 'all' ? 'All mechanics' : CORES.find((c) => c.id === filter)?.label ?? filter;
+  const activeLabel = filter === 'all' ? 'All games' : CORES.find((c) => c.id === filter)?.label ?? filter;
 
   return (
     <section>

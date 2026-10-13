@@ -2,17 +2,25 @@
 
 ## Why this repository exists
 
-This is not a collection of games. It is a test bench for mini-game mechanics with one goal:
-find the ones that can later be embedded into a live casino game or a slot, either whole or
-as a bonus feature. Every game here either maps onto one of the eight math cores (below) or
-is explicitly marked as a feel experiment with no path to embedding. We do not build games
-for their own sake.
+A workshop for game ideas the company can use. An idea comes in one of two kinds:
 
-The bench must answer three questions:
+- **Mechanic**: an arcade mechanic to embed into a live casino game or a slot, whole or as a
+  bonus feature. It maps onto one of the eight math cores (below) or is explicitly marked as
+  a feel experiment with no path to embedding.
+- **Game**: a complete game that stands as a product of its own, for example a multiplayer
+  table game with its own server and lobby. It may use a core or none; its passport names
+  the business model and the licence category it needs.
 
-1. Is the mechanic playable on its own, as rectangles and numbers, before any art.
-2. Does it fit server-side gambling math: a server-side random process plus EV-neutral
-   risk decisions by the player.
+We do not build games for their own sake: every idea has a passport that says which kind it
+is and how the company could ship it.
+
+The bench must answer three questions about every idea:
+
+1. Is it playable on its own, as rectangles and numbers, before any art.
+2. Does it fit server-side gambling math. For a mechanic: a server-side random process plus
+   EV-neutral risk decisions by the player. For a game: a stated business model
+   (house-banked with a fixed RTP, rake from player pots, or play money) and a server that
+   decides every outcome.
 3. How engaging is it, according to the telemetry the bench records itself.
 
 Context: a 48-hour hackathon prototype for a live-casino operator. We optimise for a live
@@ -35,7 +43,12 @@ apps/bench/                    React + Vite, the bench itself
 packages/protocol/             zod: manifest, registry, host↔game messages; parseWith → { ok, value } | { ok, reason }
 packages/rng/                  mulberry32 → { next, int, shuffle }; the only place Math.random may appear
 packages/game-sdk/             connect(onInit): game:ready → host:init → session { seed, sessionId, rng, emit }
+apps/alchemy-brawl/            a game with its own server: three workspaces in one folder
+  shared/                      @evo/brawl-shared: pure hand engine, scoring, per-seat view, zod protocol
+  server/                      @evo/brawl-server: Node + ws, lobby, tables, timers, bots; ws://localhost:5191/ws
+  client/                      @evo/brawl-client: Vite + React lobby and HUD, Phaser table; http://localhost:5190
 scripts/new-game.mjs           yarn new-game <id> [Title]: copies the template, nothing else to register
+docs/passports/<id>.md         one passport per game, written before its code
 ```
 
 Target layout as code appears (do not create earlier than needed):
@@ -43,8 +56,16 @@ Target layout as code appears (do not create earlier than needed):
 ```
 packages/engine    pure cores, zero dependencies, zero IO
 apps/server        round loop, ws, bet ledger
-apps/client        Pixi board, CSS HUD
+apps/client        Phaser board, CSS HUD
 ```
+
+A game that needs its own server and tables lives in one folder `apps/<id>/` with three
+workspaces, as `apps/alchemy-brawl/` does: `shared` (pure engine and the zod protocol, used by
+both sides), `server` and `client`. The root `workspaces` lists `apps/<id>/*`, and one root
+script runs client and server together. The server owns every hidden card and sends each seat
+only its own view; the client renders that view and the events. The client still opens from
+the bench gallery (list `http://localhost:<port>/` in `games.external.json` while it runs) and
+emits `round` through `@evo/game-sdk`, so the same telemetry covers it.
 
 ## Commands
 
@@ -55,6 +76,7 @@ yarn typecheck    # tsc --noEmit
 yarn test         # vitest run
 yarn build
 yarn new-game <id> [Title words...]
+yarn brawl        # Alchemy Brawl: server and client together, http://localhost:5190
 ```
 
 ## Game contract
@@ -72,7 +94,8 @@ relative to `manifest.json`.
 `postMessage` or the PRNG directly.
 
 `manifest.json`: `id` (`[a-z0-9-]`), `version`, `title`, `description`, `cover`, `entry`,
-optional `core`, one of `ladder | mines | pick | draw | cascade | race | board | collect`.
+optional `core`, one of `ladder | mines | pick | draw | cascade | race | board | collect`;
+omitted for a game that maps onto no core.
 
 postMessage, protocol 1 (`PROTOCOL_VERSION` in `packages/protocol`):
 
@@ -89,15 +112,17 @@ the tests, README, the template and the d20 example in the same commit.
 
 - All randomness comes from the host `seed` through `session.rng`. One seed, one deal; the
   "Relaunch" button must reproduce the session. Without a host, `connect()` supplies seed 1
-  and the game works standalone.
+  and the game works standalone. A game with its own server draws all randomness on the
+  server, one seed per hand, and the client never draws any.
 - `Math.random()` is allowed only inside `packages/rng`. Games never call it.
 - Money is in integer units. Multipliers may be fractional; the payout is rounded down at
   exactly one point, after summing.
-- Wireframe facade first: rectangles and numbers. If the mechanic does not hold interest
+- Wireframe facade first: rectangles and numbers. If the idea does not hold interest
   that way, art will not save it. Art comes after the passport and telemetry say "yes".
 - The `round` event is mandatory for every game. Minimum `data` fields: `round`, `seed`,
   `stake`, `payout`, `balance`; the rest is game-specific (for d20: `roll` and `bets`). The
-  scorecard is computed from these logs, so do not rename these fields.
+  scorecard is computed from these logs, so do not rename these fields. In a game, one
+  round is one hand or deal.
 - For interactive cores (`ladder`, `mines`, `pick` with a ladder) all hidden state, such as
   the bust point, mine positions or card order, is generated in full at the start of the
   round; player decisions only index into it. Replay = `(seed, config version, bets,
@@ -108,7 +133,7 @@ the tests, README, the template and the d20 example in the same commit.
 
 ## Cores and the embeddability filter
 
-A mechanic is embeddable if (a) the server can resolve the outcome before any player action
+This filter applies to mechanics. A mechanic is embeddable if (a) the server can resolve the outcome before any player action
 and (b) every player action leaves the expected value unchanged and only changes the shape
 of the variance. Execution skill goes away, risk skill stays.
 
@@ -127,29 +152,34 @@ of the variance. Execution skill goes away, risk skill stays.
 density, and a pick from N is a ladder one step long. One `sequentialHazard` engine and one
 RTP test cover all three cores.
 
-Does not convert: execution skill (platformers, shooters, rhythm), deduction and information
-(real minesweeper, puzzles: the optimal strategy is computable, bots within a week), PvP for
-money (a different licence category), a session longer than a betting round.
+Does not convert into an embedded mechanic: execution skill (platformers, shooters, rhythm),
+deduction and information (real minesweeper, puzzles: the optimal strategy is computable,
+bots within a week), PvP for money (a different licence category), a session longer than a
+betting round. A game may still be built on decision skill or PvP as a standalone product
+(as poker is), as long as its passport names the licence category and the business model.
+Execution skill and computable puzzles stay out in both kinds.
 
 Changes freely, without recomputing the math: theme, art, sound, pace, win ceremony, input
 gesture, round length. Everything that lives in config, such as paytable, hazard curve and
 RTP, is math, and any change requires updating the RTP test.
 
-## Mechanic passport, before code
+## Passport, before code
 
-File `docs/passports/<id>.md`, filled in before the first line of game code. If the core is
-not obvious, ask; this is not trivia.
+File `docs/passports/<id>.md`, filled in before the first line of game code. If the kind or
+the core is not obvious, ask; this is not trivia.
 
 ```
-## Mechanic passport: <name>
-Core: one of 8 / none (then a feel experiment, not a candidate for embedding)
-Source of randomness: single draw / sequential hazard / drop / race / board
-Player decisions: list; for each, what it changes in the variance shape and why it leaves EV untouched
+## Passport: <name>
+Kind: mechanic / game
+Core: one of 8 / none (mechanic: a feel experiment, not a candidate for embedding; game: say what decides the outcome)
+Source of randomness: single draw / sequential hazard / drop / race / board / shuffled deck
+Player decisions: list; mechanic: what each changes in the variance shape and why it leaves EV untouched; game: what skill each rewards
 Removed from the original: execution skill / deduction / information
 Kept: gesture / exit moment / risk profile / pick from N
-Round format: shared per table (live) / individual (slot) / both; round length, sec
-Embedding level: A standalone live game / B bonus feature / C presentation only
-Red flags: illusion of control / appeal to children / progress that burns / artificial near-miss
+Round format: shared per table (live) / individual (slot) / multiplayer table (seats, create or join); round length, sec
+Business model: house-banked with RTP / rake from pots / play money; licence category
+Embedding level: A standalone game / B bonus feature / C presentation only
+Red flags: illusion of control / appeal to children / progress that burns / artificial near-miss / collusion
 Free when porting: theme, art, sound, pace, input. Requires recertification: everything in config
 ```
 
@@ -165,7 +195,12 @@ bonus features).
   workspaces with the `node-modules` linker; the release is vendored in `.yarn/releases`.
   TypeScript 7 is installed under the alias `typescript7` because Yarn's built-in TypeScript
   compat patch does not understand the TS 7 package layout; the `tsc` binary resolves as usual.
-- The stack is pinned: React + Vite, zod, vitest, ws for the server, PixiJS for the board.
+- The stack is pinned: React + Vite, zod, vitest, ws for the server, Phaser for the board
+  (tweens, particles, camera shake and flash, sprite-sheet animations are built in).
+- Servers run TypeScript directly on Node's type stripping, with no build step. Relative
+  imports there and in the shared code they load carry the `.ts` extension, and only
+  erasable syntax is allowed (no enums, namespaces or parameter properties);
+  `erasableSyntaxOnly` enforces it.
   Ask before adding any new dependency.
 - No `any`, no non-null assertions, no `as` except at parsing boundaries. `as const` does not
   count.
@@ -184,7 +219,8 @@ Before any report of a completed task run `yarn typecheck && yarn test && yarn b
 quote the actual output. Not run means not done.
 
 For the engine, once it exists: unit tests for every function with payout math; Monte Carlo
-over 10M rounds with RTP within 0.15% of config and a bounded max win; state machine tests
+over 10M rounds with RTP within 0.15% of config and a bounded max win (for a rake game
+without RTP: Monte Carlo against the probabilities in its spec); state machine tests
 (a bet after LOCK is rejected with a typed error, a duplicate betId is ignored, a
 disconnected player still receives the payout). Changing a paytable without updating the RTP
 test is a build error.
@@ -198,7 +234,9 @@ all of them:
   ≥5x/≥20x/≥100x, suspense/surprise curve (Ely, Frankel, Kamenica 2015), comparison of K bot
   policies (equal EV, different shapes, otherwise the decision is fictitious), an adversarial
   agent that must not beat the RTP.
-- Bots: scripted policies through the same `Decision` a human uses.
+- Bots: scripted policies through the same `Decision` a human uses. In a game with
+  skill, bots also measure the skill gradient: a stronger bot must beat a weaker one over
+  many hands while the weaker one still wins single hands.
 - People, from bench logs: rounds until voluntary exit, latency of risk decisions, stake
   dynamics after losses, tab focus loss, one question "want more?" on a 1–5 scale. Everyone
   gets the same set of seeds, comparison is relative only.
@@ -218,7 +256,9 @@ are descriptive comparators with ceilings, not targets to maximise.
   free to use. SRD 5.1/5.2 mechanics are available under CC-BY-4.0 with attribution.
 - Visual style is dark "book" fantasy, not bright cartoon: appeal to children is a direct
   question from UKGC, Spelinspektionen and KSA.
-- Neither the rules nor the interface tone may hint that skill improves return. The narrator
+- In house-banked play, neither the rules nor the interface tone may hint that skill
+  improves return. In a peer-to-peer game skill is the product and may be said so; the house
+  earns from rake, never from the outcome. The narrator
   never urges the player to continue; losses are narrated neutrally. We do not build progress
   that burns when the session ends.
 - If an LLM is used: it receives an already-resolved outcome object and returns text only.
