@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Warsaw Streets</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game" width="480" height="270" tabindex="0"></canvas>
+
+  <!-- generated atlas data (tools/extract.html) -->
+  <script src="data/atlas_nina.js"></script>
+  <script src="data/atlas_goon.js"></script>
+  <!-- game data -->
+  <script src="data/characters.js"></script>
+  <script src="data/stages.js"></script>
+  <!-- engine -->
+  <script src="src/util.js"></script>
+  <script src="src/animation.js"></script>
+  <script src="src/input.js"></script>
+  <script src="src/font.js"></script>
+  <script src="src/fighter.js"></script>
+  <script src="src/ai.js"></script>
+  <script src="src/stage.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/main.js"></script>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

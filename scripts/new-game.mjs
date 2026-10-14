@@ -9,7 +9,7 @@ if (id === undefined || !/^[a-z0-9-]+$/.test(id)) {
   process.exit(1);
 }
 
-const gamesDir = resolve(import.meta.dirname, '../apps/bench/games');
+const gamesDir = resolve(import.meta.dirname, '../games');
 const template = resolve(gamesDir, '_template');
 const target = resolve(gamesDir, id);
 
@@ -25,4 +25,6 @@ for (const name of readdirSync(target)) {
   const text = readFileSync(file, 'utf8').replaceAll('__ID__', id).replaceAll('__TITLE__', title);
   writeFileSync(file, text);
 }
-console.log(`created apps/bench/games/${id} — it is already in the gallery. Write docs/passports/${id}.md before touching main.ts.`);
+console.log(
+  `created games/${id} — it is already on the server at /games/${id}/ and in the library. Write docs/passports/${id}.md before touching main.ts.`,
+);

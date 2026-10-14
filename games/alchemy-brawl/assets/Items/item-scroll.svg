@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+<defs>
+  <filter id="tex" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.11  0 0 0 0 0.07  0 0 0 0 0.04  0.8 0 0 0 -0.3" result="a"/>
+    <feComposite in="a" in2="SourceGraphic" operator="in" result="t"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="t"/></feMerge>
+  </filter>
+  <filter id="grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.015 0.35" numOctaves="3" seed="2" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.12  0 0 0 0 0.07  0 0 0 0 0.03  1.3 0 0 0 -0.45" result="a"/>
+    <feComposite in="a" in2="SourceGraphic" operator="in" result="t"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="t"/></feMerge>
+  </filter>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+  <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.5"/></filter>
+
+  <linearGradient id="woodH" x1="0" x2="1" y1="0" y2="0">
+    <stop offset="0" stop-color="#3a2614"/><stop offset=".35" stop-color="#8a5c33"/>
+    <stop offset=".55" stop-color="#9c6b3d"/><stop offset="1" stop-color="#3a2614"/></linearGradient>
+  <linearGradient id="woodV" x1="0" x2="0" y1="0" y2="1">
+    <stop offset="0" stop-color="#a5733f"/><stop offset=".5" stop-color="#7a5129"/><stop offset="1" stop-color="#3f2913"/></linearGradient>
+  <linearGradient id="iron" x1="0" x2="0" y1="0" y2="1">
+    <stop offset="0" stop-color="#b9bcc0"/><stop offset=".45" stop-color="#6b6f74"/><stop offset="1" stop-color="#2e3033"/></linearGradient>
+  <linearGradient id="ironH" x1="0" x2="1" y1="0" y2="0">
+    <stop offset="0" stop-color="#2e3033"/><stop offset=".4" stop-color="#9ea2a7"/><stop offset=".6" stop-color="#7d8186"/><stop offset="1" stop-color="#2e3033"/></linearGradient>
+  <linearGradient id="gold" x1="0" x2="0" y1="0" y2="1">
+    <stop offset="0" stop-color="#ffe7a3"/><stop offset=".45" stop-color="#d4a64a"/><stop offset="1" stop-color="#6e4f17"/></linearGradient>
+  <radialGradient id="shadow" cx=".5" cy=".5" r=".5">
+    <stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+
+  <radialGradient id="rim" cx=".5" cy=".4" r=".6">
+    <stop offset="0" stop-color="#a57447"/><stop offset=".8" stop-color="#6b4526"/><stop offset="1" stop-color="#3a2410"/></radialGradient>
+  <radialGradient id="parch" cx=".45" cy=".4" r=".65">
+    <stop offset="0" stop-color="#f6ecd2"/><stop offset=".7" stop-color="#dcc79c"/><stop offset="1" stop-color="#a88b5c"/></radialGradient>
+  <linearGradient id="steel" x1="0" x2="1" y1="0" y2="0">
+    <stop offset="0" stop-color="#5f656c"/><stop offset=".48" stop-color="#e9edf0"/><stop offset=".52" stop-color="#9aa1a8"/><stop offset="1" stop-color="#454a50"/></linearGradient>
+
+  <linearGradient id="roll" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fbf2d8"/><stop offset=".5" stop-color="#d8c193"/><stop offset="1" stop-color="#8f7146"/></linearGradient>
+  <radialGradient id="wax" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#f05a50"/><stop offset=".6" stop-color="#a51b1b"/><stop offset="1" stop-color="#5a080c"/></radialGradient>
+</defs>
+
+<circle cx="64" cy="66" r="60" fill="#000" opacity=".35" filter="url(#soft)"/>
+<g filter="url(#tex)">
+
+<circle cx="64" cy="64" r="58" fill="url(#rim)" stroke="#1c130b" stroke-width="3" filter="url(#grain)"/>
+<circle cx="64" cy="64" r="47" fill="url(#parch)" stroke="#1c130b" stroke-width="2.5"/>
+<circle cx="64" cy="64" r="47" fill="none" stroke="#5a3b1c" stroke-opacity=".35" stroke-width="5"/>
+<path d="M22 46 A46 46 0 0 1 60 10" fill="none" stroke="#e5b98a" stroke-opacity=".45" stroke-width="3"/>
+<g transform="rotate(-35 64 64)">
+<rect x="38" y="40" width="52" height="48" fill="#ecdcb4" stroke="#1c130b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M44 52 H84 M44 60 H80 M44 68 H84 M44 76 H72" stroke="#7a6142" stroke-opacity=".55" stroke-width="1.6"/>
+<rect x="32" y="33" width="64" height="12" rx="6" fill="url(#roll)" stroke="#1c130b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<ellipse cx="32.5" cy="39" rx="3" ry="6" fill="#b89a6a" stroke="#1c130b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="32" y="83" width="64" height="12" rx="6" fill="url(#roll)" stroke="#1c130b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<ellipse cx="95.5" cy="89" rx="3" ry="6" fill="#b89a6a" stroke="#1c130b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M76 92 L72 108 L77 104 L80 109 L82 93 Z" fill="#8e1414" stroke="#1c130b" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M84 92 L90 106 L84 103 L83 108 L80 93 Z" fill="#b3261e" stroke="#1c130b" stroke-width="1.5" stroke-linejoin="round"/>
+<circle cx="80" cy="89" r="9" fill="url(#wax)" stroke="#1c130b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="80" cy="89" r="5" fill="none" stroke="#5a080c" stroke-width="1.5"/>
+<path d="M76 85 Q78 83 81 83" fill="none" stroke="#ffb3a8" stroke-width="1.4"/></g>
+</g>
+</svg>

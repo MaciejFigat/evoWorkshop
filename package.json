@@ -4,12 +4,12 @@
   "packageManager": "yarn@4.17.0",
   "workspaces": [
     "apps/*",
-    "apps/alchemy-brawl/*",
+    "games/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "yarn workspace bench dev",
-    "brawl": "yarn workspaces foreach -A -piv --include '@evo/brawl-*' run dev",
+    "dev": "yarn workspace @evo/web dev",
+    "start": "yarn workspace @evo/web start",
     "typecheck": "yarn workspaces foreach -A --topological run typecheck",
     "test": "yarn workspaces foreach -A --topological run test",
     "build": "yarn workspaces foreach -A --topological run build",
