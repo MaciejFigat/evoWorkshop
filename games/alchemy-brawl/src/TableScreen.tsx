@@ -18,29 +18,46 @@ function betAmount(hand: HandView, kind: BetKind): number {
   return Math.max(0, level - me.roundCommitted);
 }
 
-function optionFor(hand: HandView, card: Card | null): string {
-  if (card === null) {
-    return '';
-  }
+function optionFor(hand: HandView, card: Card): string {
   const option = hand.you?.options.find((entry) => sameCard(entry.card, card));
   return option === undefined ? '' : describeCombination(option.combination);
 }
 
-// One frame of the action cluster under the table: a status line over the buttons, a hint under them.
-type Frame = { status: string; actions: ReactNode; hint: string };
+// One frame of the action cluster under the table: a status line, a row of info chips, the buttons,
+// a hint under them. Chips and buttons are null in frames that have none.
+type Frame = { status: string; chips: ReactNode; actions: ReactNode; hint: string };
 
-function Pill({ kind, amount, onClick, disabled = false }: { kind: string; amount?: number; onClick: () => void; disabled?: boolean }) {
-  const primary = kind === 'stay' || kind === 'call' || kind === 'check';
+function Chip({ label, value }: { label: string; value?: string }) {
   return (
-    <button
-      type="button"
-      className={`pill${primary ? ' primary' : ''}${kind === 'fold' ? ' quiet' : ''}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
+    <span className="act-chip">
+      <span className="act-chip-label">{label}</span>
+      {value !== undefined && <b>{value}</b>}
+    </span>
+  );
+}
+
+type ActionKind = BetKind | 'stay' | 'skip';
+
+// Fold reads as a warning, raise and stay as the move the table expects, the rest stays neutral.
+const TONE: Record<ActionKind, 'fold' | 'neutral' | 'gold'> = {
+  fold: 'fold',
+  check: 'neutral',
+  call: 'neutral',
+  skip: 'neutral',
+  bet: 'gold',
+  raise: 'gold',
+  stay: 'gold',
+};
+
+// Poker-room order: fold, check or call, bet or raise.
+const BET_ORDER: BetKind[] = ['fold', 'check', 'call', 'bet', 'raise'];
+
+function Action({ kind, amount = 0, onClick, disabled = false }: { kind: ActionKind; amount?: number; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className={`act act-${TONE[kind]}`} disabled={disabled} onClick={onClick}>
       <span>
         {kind}
-        {amount !== undefined && amount > 0 && <small>{amount}</small>}
+        {amount > 0 && <small>{amount}</small>}
       </span>
     </button>
   );
@@ -59,40 +76,45 @@ function decideFrame(net: Net, hand: HandView, picked: Selection): Frame {
     selection.clear();
   };
   return {
-    status: 'Round 1: stay or skip. Click the card you will show.',
-    actions: (
+    status: 'Round 1: stay or skip. Your turn.',
+    chips: (
       <>
-        <Pill kind="stay" disabled={show === null} onClick={stay} />
-        <Pill kind="skip" onClick={skip} />
+        <Chip label="Round 1 pot" value={String(hand.round1Pot)} />
+        {show === null ? <Chip label="Pick a card to show" /> : <Chip label="Show" value={`${cardName(show)} · ${optionFor(hand, show)}`} />}
       </>
     ),
-    hint:
-      show === null
-        ? 'No chips at risk in Round 1. The shown card stays face up until the end of the hand.'
-        : `Show ${cardName(show)}: ${optionFor(hand, show)}. It stays face up until the end of the hand.`,
+    actions: (
+      <>
+        <Action kind="skip" onClick={skip} />
+        <Action kind="stay" disabled={show === null} onClick={stay} />
+      </>
+    ),
+    hint: 'No chips at risk in Round 1. The shown card stays face up until the end of the hand.',
   };
 }
-
-const FINAL_STATUS = 'Final: all your cards play. Fixed-limit betting.';
 
 function betFrame(net: Net, table: TableView, hand: HandView): Frame {
   const you = hand.you;
   const nameOf = nameResolver(table, hand);
-  if (you === null || you.legalBets.length === 0) {
-    const actor = hand.betting?.actor;
-    return {
-      status: FINAL_STATUS,
-      actions: null,
-      hint: actor === null || actor === undefined ? '' : `${nameOf(actor)} to act.`,
-    };
-  }
-  const call = you.legalBets.includes('call') ? betAmount(hand, 'call') : 0;
+  const yourTurn = you !== null && you.legalBets.length > 0;
+  const call = yourTurn && you.legalBets.includes('call') ? betAmount(hand, 'call') : 0;
   const rate = call > 0 ? ((call / (hand.finalPot + call)) * 100).toFixed(1) : null;
+  const actor = hand.betting?.actor;
+  const chips = (
+    <>
+      <Chip label="Pot" value={String(hand.finalPot)} />
+      {call > 0 && <Chip label="To call" value={String(call)} />}
+      {you !== null && you.best !== null && <Chip label="Best" value={describeCombination(you.best)} />}
+    </>
+  );
+  if (you === null || !yourTurn) {
+    return { status: actor === null || actor === undefined ? 'Final: fixed-limit betting.' : `${nameOf(actor)} to act.`, chips, actions: null, hint: '' };
+  }
+  const legal = BET_ORDER.filter((kind) => you.legalBets.includes(kind));
   return {
-    status: `${FINAL_STATUS} Your turn.`,
-    actions: you.legalBets.map((kind) => (
-      <Pill key={kind} kind={kind} amount={betAmount(hand, kind)} onClick={() => net.send({ type: 'bet', kind })} />
-    )),
+    status: 'Your turn.',
+    chips,
+    actions: legal.map((kind) => <Action key={kind} kind={kind} amount={betAmount(hand, kind)} onClick={() => net.send({ type: 'bet', kind })} />),
     hint: rate === null ? '' : `Call ${call} into ${hand.finalPot}: worth it if you win more than ${rate}% of the time.`,
   };
 }
@@ -100,9 +122,9 @@ function betFrame(net: Net, table: TableView, hand: HandView): Frame {
 function frameFor(net: Net, table: TableView, hand: HandView, picked: Selection): Frame {
   const you = hand.you;
   const nameOf = nameResolver(table, hand);
-  const idle = (status: string, hint = ''): Frame => ({ status, actions: null, hint });
+  const idle = (status: string, hint = ''): Frame => ({ status, chips: null, actions: null, hint });
   if (you === null) {
-    return { status: 'Watching: you join from the next hand.', actions: null, hint: '' };
+    return idle('Watching: you join from the next hand.');
   }
   switch (hand.phase) {
     case 'decide':
@@ -142,7 +164,7 @@ export function TableScreen({
 
   const frame: Frame =
     hand === null
-      ? { status: 'Waiting for the hand to start.', actions: null, hint: '' }
+      ? { status: 'Waiting for the hand to start.', chips: null, actions: null, hint: '' }
       : frameFor(net, table, hand, picked);
 
   return (
@@ -185,7 +207,8 @@ export function TableScreen({
             <span className="hud-status" title={frame.status}>
               {frame.status}
             </span>
-            <div className="hud-buttons">{frame.actions}</div>
+            {frame.chips !== null && <div className="act-chips">{frame.chips}</div>}
+            {frame.actions !== null && <div className="hud-buttons">{frame.actions}</div>}
             <p className="hud-hint" title={frame.hint}>
               {frame.hint}
             </p>

@@ -185,31 +185,6 @@ code {
   min-width: 0;
 }
 
-.chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--parchment);
-  font-size: 10px;
-  line-height: 1;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.chip b {
-  font-weight: normal;
-  font-size: 13px;
-  letter-spacing: 0;
-  color: var(--gold);
-  font-variant-numeric: tabular-nums;
-}
-
 .dot {
   flex: none;
   width: 8px;
@@ -247,21 +222,154 @@ code {
   min-width: 0;
 }
 
-.rules p {
-  margin: 0 0 8px;
+/* ---- rules: four steps, each a badge, a title, a mini-card diagram and one caption. Stacked in
+   the name screen's column, a 2x2 grid in the overlay. ---- */
+.rules-lead {
+  margin: 0 0 10px;
+  color: var(--muted);
 }
 
-.rules ul {
+.steps {
+  list-style: none;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-.rules li {
-  margin-bottom: 6px;
+.rules.compact .steps {
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
-.rules li::marker {
+.step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.rules.compact .step {
+  padding: 6px 8px;
+  row-gap: 3px;
+}
+
+/* In the narrow column the caption runs under the badge, full width, so it stays to two or three lines. */
+.rules.compact .step-badge {
+  grid-row: 1 / span 2;
+}
+
+.rules.compact .step-caption {
+  grid-column: 1 / -1;
+}
+
+.step-badge {
+  grid-row: 1 / span 3;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold);
+  color: #1c150c;
+  font-size: 12px;
+}
+
+.step-title {
+  line-height: 22px;
+  color: var(--ink);
+}
+
+.step-diagram {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.rules.compact .step-diagram {
+  min-height: 24px;
+  gap: 4px;
+}
+
+.step-caption {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.rules.compact .step-caption {
+  font-size: 11px;
+}
+
+.step-gap {
+  width: 4px;
+}
+
+.step-arrow {
+  color: var(--muted);
+}
+
+.step-label {
+  font-size: 11px;
   color: var(--gold);
+}
+
+.rules-ante {
+  width: 26px;
+  height: 26px;
+  margin-left: 4px;
+  border-radius: 50%;
+  border: 2px dashed #f0d672;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold);
+  color: #1c150c;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.rules-bets {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 2px;
+}
+
+.rules-bet {
+  padding: 3px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.rules-bet.fold {
+  background: rgba(208, 52, 44, 0.25);
+  border: 1px solid var(--burn);
+}
+
+.rules-bet.call {
+  background: var(--parchment);
+  border: 1px solid var(--line);
+}
+
+.rules-bet.raise {
+  background: var(--gold);
+  border: 1px solid var(--gold);
+  color: #1c150c;
 }
 
 .lobby {
@@ -424,7 +532,8 @@ code {
 }
 
 .overlay .panel {
-  max-width: 520px;
+  width: 820px;
+  max-width: 100%;
   max-height: 100%;
   overflow: auto;
   background: var(--parchment);
@@ -434,9 +543,9 @@ code {
   margin-top: 10px;
 }
 
-/* ---- the control bar: a fixed-height strip under the board. Tiles on the left, the action cluster
-   centred over the table as long as the tiles leave room (the empty third column balances them),
-   the hint under the buttons. ---- */
+/* ---- the control bar: a fixed-height strip under the board, the action cluster centred. Status
+   line, info chips, the big buttons: 16 + 24 + 52 and two 2px gaps fill the 96px exactly, so the
+   hint hangs under the strip into the spare room below. ---- */
 .hud {
   flex: none;
   height: 96px;
@@ -447,17 +556,20 @@ code {
 }
 
 .hud-actions {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 2px;
+  height: 96px;
   min-width: 260px;
   max-width: 640px;
 }
 
 /* Without buttons the status takes their room: a Round 1 or showdown result reads in full. */
 .hud-actions.no-actions .hud-status {
-  height: 56px;
+  height: 54px;
   line-height: 18px;
   white-space: normal;
   text-align: center;
@@ -466,18 +578,54 @@ code {
   -webkit-line-clamp: 3;
 }
 
-.hud-actions.no-actions .hud-buttons {
-  display: none;
+.hud-actions.no-actions .hud-hint {
+  position: static;
+  width: auto;
+  max-width: 100%;
+  transform: none;
 }
 
 .hud-status {
   max-width: 100%;
-  height: 18px;
-  line-height: 18px;
+  height: 16px;
+  line-height: 16px;
   font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.act-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  max-width: 100%;
+}
+
+.act-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  height: 24px;
+  padding: 4px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--parchment);
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.act-chip-label {
+  color: var(--muted);
+}
+
+.act-chip b {
+  font-weight: normal;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .hud-buttons {
@@ -485,70 +633,77 @@ code {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  height: 40px;
+  height: 52px;
 }
 
 .hud-hint {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 640px;
+  transform: translateX(-50%);
   margin: 0;
-  max-width: 100%;
   height: 14px;
   line-height: 14px;
   font-size: 11px;
+  text-align: center;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Pill buttons: the action cluster. The label and its amount share a baseline inside the centred span. */
-.pill {
-  height: 40px;
-  min-width: 104px;
-  padding: 0 20px;
-  border-radius: 999px;
-  border: 1px solid #7a6540;
-  background: linear-gradient(180deg, #3a3028 0%, #26201a 100%);
-  color: var(--ink);
-  font-size: 14px;
-  letter-spacing: 0.06em;
+/* The action buttons: equal size, the label uppercase with its amount in lighter small text beside it. */
+.act {
+  width: 150px;
+  height: 52px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 15px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  box-shadow: 0 2px 0 #0d0a08, inset 0 1px 0 #4d4034;
+  color: var(--ink);
 }
 
-.pill > span {
+.act > span {
   display: inline-flex;
   align-items: baseline;
-  gap: 7px;
+  gap: 8px;
 }
 
-.pill small {
+.act small {
   font-size: 12px;
-  color: var(--gold);
   letter-spacing: 0;
+  opacity: 0.75;
 }
 
-.pill.primary {
-  background: linear-gradient(180deg, #e2bb45 0%, #b88d1f 100%);
-  border-color: #e9c75c;
+.act-fold {
+  background: rgba(208, 52, 44, 0.25);
+  border: 1px solid var(--burn);
+}
+
+.act-neutral {
+  background: var(--parchment);
+  border: 1px solid var(--line);
+}
+
+.act-gold {
+  background: var(--gold);
+  border: 1px solid var(--gold);
   color: #1c150c;
-  box-shadow: 0 2px 0 #5c4510, inset 0 1px 0 #f3dc8a;
 }
 
-.pill.primary small {
-  color: #3a2a08;
+.act:hover:not(:disabled) {
+  filter: brightness(1.12);
+  color: inherit;
+  border-color: inherit;
 }
 
-.pill.primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #f0ca55 0%, #c69a2a 100%);
+.act-gold:hover:not(:disabled) {
   color: #1c150c;
 }
 
-.pill.quiet {
-  background: transparent;
-  border-color: var(--line);
-}
-
-.pill:disabled {
+.act:disabled {
   opacity: 0.35;
 }
 
@@ -607,15 +762,16 @@ code {
 .combos th {
   text-align: left;
   font-weight: normal;
-  vertical-align: top;
+  vertical-align: middle;
   white-space: nowrap;
   color: var(--ink);
-  padding: 3px 8px 3px 6px;
+  padding: 1px 8px 1px 6px;
 }
 
 .combos td {
-  color: var(--muted);
-  padding: 3px 6px 3px 0;
+  vertical-align: middle;
+  padding: 1px 6px 1px 0;
+  text-align: right;
 }
 
 .combos tr.active th,
@@ -642,11 +798,112 @@ code {
 }
 
 .history li {
-  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 0;
   border-top: 1px solid var(--line);
 }
 
 .history li:first-child {
-  color: var(--ink);
   border-top: none;
+}
+
+.hist-hand {
+  flex: none;
+  color: var(--ink);
+}
+
+.hist-stage {
+  flex: none;
+  width: 20px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.hist-winners {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.hist-winner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.hist-winner b {
+  font-weight: normal;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.hist-note {
+  flex: none;
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* ---- mini cards: the element is the colour, the power is the number ---- */
+.mini {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 30px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1;
+  color: #fff6e6;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini.sm {
+  width: 18px;
+  height: 24px;
+  font-size: 11px;
+}
+
+.mini.fire {
+  background: #e4572e;
+}
+
+.mini.water {
+  background: #3a86ff;
+}
+
+.mini.earth {
+  background: #6a994e;
+}
+
+.mini.air {
+  background: #d9d3b6;
+  color: #1c150c;
+}
+
+.mini.back {
+  background: radial-gradient(circle at center, #8b6fb3 0 2.5px, #3b2a52 3.5px);
+  border: 1px solid #5b4580;
+}
+
+.mini.lit {
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.mini-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
