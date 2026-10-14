@@ -1,11 +1,11 @@
-import { MAX_PLAYERS, MIN_PLAYERS, type LobbyTable } from '@evo/brawl-shared';
+import { DEFAULT_SEATS, MAX_PLAYERS, MIN_PLAYERS, type LobbyTable } from '@evo/brawl-shared';
 import { useState } from 'react';
 import type { Net } from './net';
 
 const SEAT_CHOICES = Array.from({ length: MAX_PLAYERS - MIN_PLAYERS + 1 }, (_, i) => MIN_PLAYERS + i);
 
 export function Lobby({ net, tables }: { net: Net; tables: LobbyTable[] }) {
-  const [seats, setSeats] = useState(MAX_PLAYERS);
+  const [seats, setSeats] = useState(DEFAULT_SEATS);
   const [code, setCode] = useState('');
 
   return (
@@ -31,7 +31,7 @@ export function Lobby({ net, tables }: { net: Net; tables: LobbyTable[] }) {
         className="panel"
         onSubmit={(e) => {
           e.preventDefault();
-          net.send({ type: 'join', code: code.trim() });
+          net.send({ type: 'join', code: code.trim().toUpperCase() });
         }}
       >
         <h2>Join by code</h2>
@@ -49,7 +49,7 @@ export function Lobby({ net, tables }: { net: Net; tables: LobbyTable[] }) {
             <li key={t.code}>
               <code>{t.code}</code>
               <span>
-                {t.players}/{t.maxPlayers}
+                {t.players}/{t.maxPlayers} seats
               </span>
               <button
                 type="button"

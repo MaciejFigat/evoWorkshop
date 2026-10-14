@@ -157,20 +157,31 @@ export function createConnection(emit: Emit): Net {
 
 // The bench scorecard reads `round` events: one per finished hand, from this player's seat.
 function reportRounds(view: TableView, events: HandEvent[], emit: Emit): void {
-  const seat = view.hand?.you?.seat;
-  const player = seat === undefined ? undefined : view.hand?.players[seat];
+  const hand = view.hand;
+  const seat = hand?.you?.seat;
+  const player = seat === undefined ? undefined : hand?.players[seat];
+  if (hand === null || hand === undefined || seat === undefined || player === undefined) {
+    return;
+  }
   for (const event of events) {
-    if (event.type === 'handEnded' && seat !== undefined && player !== undefined) {
-      emit('round', {
-        round: view.handNo,
-        seed: view.handSeed,
-        stake: player.committed,
-        payout: event.outcome.payouts[seat] ?? 0,
-        balance: player.stack,
-        table: view.code,
-        reason: event.outcome.reason,
-        winners: event.outcome.winners,
-      });
+    if (event.type !== 'handEnded') {
+      continue;
     }
+    const result = event.result;
+    const round1 = hand.round1;
+    const combination = result.combinations.find((entry) => entry.seat === seat)?.combination;
+    emit('round', {
+      round: view.handNo,
+      seed: view.handSeed,
+      stake: player.committed,
+      payout: (round1?.payouts[seat] ?? 0) + (result.payouts[seat] ?? 0),
+      balance: player.stack,
+      table: view.code,
+      reason: result.reason,
+      round1Winners: round1?.winners ?? [],
+      finalWinners: result.winners,
+      yourRound1: player.stayed === true ? 'stayed' : 'skipped',
+      yourFinal: player.folded ? 'folded' : (combination?.category ?? 'unrevealed'),
+    });
   }
 }

@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import {
   parseClientMessage,
   type ClientMessage,
+  type LobbyTable,
   type ServerError,
   type ServerMessage,
   type TableConfig,
@@ -20,7 +21,7 @@ export class Lobby {
   private readonly byToken = new Map<string, Player>();
   private readonly byId = new Map<string, Player>();
   private readonly byConn = new Map<Connection, Player>();
-  private readonly tables = new Map<string, Table>();
+  private readonly byCode = new Map<string, Table>();
 
   constructor(config: TableConfig) {
     this.config = config;
@@ -42,6 +43,10 @@ export class Lobby {
     if (error !== null) {
       conn.send({ type: 'error', reason: error });
     }
+  }
+
+  tables(): LobbyTable[] {
+    return [...this.byCode.values()].map((t) => t.info());
   }
 
   disconnect(conn: Connection): void {
@@ -83,8 +88,8 @@ export class Lobby {
         return this.leave(player);
       case 'addBot':
         return player.table === null ? 'not_seated' : this.afterChange(player.table.addBot());
+      case 'decide':
       case 'cast':
-        return player.table === null ? 'not_seated' : player.table.act(player.id, message);
       case 'bet':
         return player.table === null ? 'not_seated' : player.table.act(player.id, message);
     }
@@ -99,12 +104,12 @@ export class Lobby {
       deliver: (id, message) => this.byId.get(id)?.conn?.send(message),
       onSeatsChanged: () => this.syncSeats(table),
     });
-    this.tables.set(code, table);
+    this.byCode.set(code, table);
     return this.join(player, code);
   }
 
   private join(player: Player, code: string): ServerError | null {
-    const table = this.tables.get(code);
+    const table = this.byCode.get(code);
     if (table === undefined) {
       return 'no_such_table';
     }
@@ -139,7 +144,7 @@ export class Lobby {
     }
     if (table.humanCount() === 0) {
       table.close();
-      this.tables.delete(table.code);
+      this.byCode.delete(table.code);
     }
     this.broadcastLobby();
   }
@@ -152,7 +157,7 @@ export class Lobby {
   }
 
   private lobbyMessage(): ServerMessage {
-    return { type: 'lobby', tables: [...this.tables.values()].map((t) => t.info()) };
+    return { type: 'lobby', tables: this.tables() };
   }
 
   private broadcastLobby(): void {
@@ -168,7 +173,7 @@ export class Lobby {
     let code = '';
     do {
       code = Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET.charAt(randomInt(CODE_ALPHABET.length))).join('');
-    } while (this.tables.has(code));
+    } while (this.byCode.has(code));
     return code;
   }
 }

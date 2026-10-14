@@ -1,62 +1,30 @@
-import type { Card } from '../cards.ts';
-import { betUnit, legalBets } from './hand.ts';
-import type { BetKind, HandOutcome, HandState, Phase, RoundResult } from './types.ts';
+import { legalBets } from './hand.ts';
+import { bestCombination } from './scoring.ts';
+import type { CardOption, HandState, HandView, PlayerView, YouView } from './types.ts';
 
-export type PlayerView = {
-  id: string;
-  stack: number;
-  sigils: number;
-  casts: Card[];
-  castLocked: boolean;
-  folded: boolean;
-  committed: number;
-  roundCommitted: number;
-};
-
-export type BettingView = { level: number; bets: number; cap: number; unit: number; actor: number | null };
-
-export type YouView = {
-  seat: number;
-  hand: Card[];
-  pendingCast: Card | null;
-  canCast: boolean;
-  legalBets: BetKind[];
-};
-
-export type HandView = {
-  round: number;
-  phase: Phase;
-  button: number;
-  pot: number;
-  deckCount: number;
-  catalyst: Card | null;
-  players: PlayerView[];
-  betting: BettingView | null;
-  results: RoundResult[];
-  outcome: HandOutcome | null;
-  you: YouView | null;
-};
-
-// The only way hand state leaves the server: other players' hands and face-down casts never appear here.
 export function viewFor(state: HandState, seat: number | null): HandView {
-  const me = seat === null ? undefined : state.players[seat];
+  const windowOpen = state.phase === 'decide';
+  const players: PlayerView[] = state.players.map((player) => ({
+    id: player.id,
+    stack: player.stack,
+    // A stay spends the cast at once; while the window is open the count must not show it.
+    handCount: windowOpen && player.decision?.kind === 'stay' ? player.hand.length + 1 : player.hand.length,
+    decided: player.decision !== null,
+    stayed: windowOpen ? null : player.decision?.kind === 'stay',
+    shown: windowOpen ? null : player.shown,
+    castLocked: player.pendingCast !== null,
+    folded: player.folded,
+    committed: player.committed,
+    roundCommitted: player.roundCommitted,
+  }));
   return {
-    round: state.round,
     phase: state.phase,
     button: state.button,
-    pot: state.pot,
+    round1Pot: state.round1Pot,
+    finalPot: state.finalPot,
+    table: [...state.table],
     deckCount: state.deck.length,
-    catalyst: state.catalyst,
-    players: state.players.map((player) => ({
-      id: player.id,
-      stack: player.stack,
-      sigils: player.sigils,
-      casts: player.casts,
-      castLocked: player.pendingCast !== null,
-      folded: player.folded,
-      committed: player.committed,
-      roundCommitted: player.roundCommitted,
-    })),
+    players,
     betting:
       state.betting === null
         ? null
@@ -64,20 +32,31 @@ export function viewFor(state: HandState, seat: number | null): HandView {
             level: state.betting.level,
             bets: state.betting.bets,
             cap: state.rules.maxBetsPerRound,
-            unit: betUnit(state),
+            unit: state.rules.finalBet,
             actor: state.betting.toAct[0] ?? null,
           },
-    results: state.results,
-    outcome: state.outcome,
-    you:
-      seat === null || me === undefined
-        ? null
-        : {
-            seat,
-            hand: me.hand,
-            pendingCast: me.pendingCast,
-            canCast: state.phase === 'cast' && !me.folded && me.pendingCast === null,
-            legalBets: legalBets(state, seat),
-          },
+    round1: state.round1,
+    final: state.final,
+    you: seat === null ? null : youFor(state, seat),
+  };
+}
+
+function youFor(state: HandState, seat: number): YouView | null {
+  const player = state.players[seat];
+  if (player === undefined) {
+    return null;
+  }
+  const own = player.pendingCast === null ? player.hand : [...player.hand, player.pendingCast];
+  const options: CardOption[] =
+    state.table.length < 2 ? [] : own.map((card) => ({ card, combination: bestCombination(card, state.table) }));
+  return {
+    seat,
+    hand: [...player.hand],
+    decision: player.decision,
+    pendingCast: player.pendingCast,
+    canDecide: state.phase === 'decide' && player.decision === null,
+    canCast: state.phase === 'cast' && !player.folded && player.pendingCast === null,
+    legalBets: legalBets(state, seat),
+    options,
   };
 }

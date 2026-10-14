@@ -15,22 +15,27 @@ export function cards(labels: string): Card[] {
   return labels.split(' ').map(card);
 }
 
-// Stacks the deck in dealing order: three initial cards round-robin, then per round one draw each
-// and the Catalyst. A player with fewer than six cards has folded and skips the later draws.
-export function stackedDeck(order: number[], received: Card[][], catalysts: Card[]): Card[] {
+// Lays cards in the engine's dealing order: three cards each round-robin, the two Round 1 table
+// cards, one draw each in the same order, the three Final table cards, then the rest of the deck.
+export function stackedDeck(
+  order: number[],
+  hands: Card[][],
+  round1Table: Card[],
+  draws: Card[][],
+  finalTable: Card[],
+): Card[] {
   const top: Card[] = [];
-  const take = (seat: number, k: number): void => {
-    const next = received[seat]?.[k];
+  const take = (from: Card[][], seat: number, k: number): void => {
+    const next = from[seat]?.[k];
     if (next !== undefined) {
       top.push(next);
     }
   };
   for (let k = 0; k < 3; k += 1) {
-    order.forEach((seat) => take(seat, k));
+    order.forEach((seat) => take(hands, seat, k));
   }
-  catalysts.forEach((catalyst, round) => {
-    order.forEach((seat) => take(seat, 3 + round));
-    top.push(catalyst);
-  });
+  top.push(...round1Table);
+  order.forEach((seat) => take(draws, seat, 0));
+  top.push(...finalTable);
   return [...top, ...fullDeck().filter((c) => !top.some((used) => sameCard(used, c)))];
 }

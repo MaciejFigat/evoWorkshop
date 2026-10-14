@@ -2,8 +2,17 @@ import { parseWith, type ParseResult } from '@evo/protocol';
 import { z } from 'zod';
 import { ELEMENTS, MAX_POWER, MIN_POWER, type Card } from './cards.ts';
 import { MAX_PLAYERS, MIN_PLAYERS } from './config.ts';
-import type { BetKind, HandEvent, HandOutcome, RoundResult, StepError } from './engine/types.ts';
-import type { HandView } from './engine/view.ts';
+import {
+  CATEGORIES,
+  type BetKind,
+  type Combination,
+  type Decision,
+  type FinalResult,
+  type HandEvent,
+  type HandView,
+  type Round1Result,
+  type StepError,
+} from './engine/types.ts';
 
 export type SeatInfo = { id: string; name: string; stack: number; bot: boolean; connected: boolean };
 
@@ -13,6 +22,7 @@ export type TableView = {
   you: string;
   seats: SeatInfo[];
   handNo: number;
+  // Published once the hand is over, so a finished hand can be replayed from its seed.
   handSeed: number | null;
   hand: HandView | null;
   timeLeftMs: number | null;
@@ -30,7 +40,7 @@ export type ServerError =
   | 'not_seated'
   | 'not_in_hand';
 
-const BET_KINDS = ['check', 'bet', 'call', 'raise', 'fold'] as const satisfies readonly BetKind[];
+export const BET_KINDS = ['check', 'bet', 'call', 'raise', 'fold'] as const satisfies readonly BetKind[];
 
 const SERVER_ERRORS = [
   'not_enough_players',
@@ -38,8 +48,10 @@ const SERVER_ERRORS = [
   'wrong_phase',
   'unknown_seat',
   'folded',
+  'already_decided',
   'already_cast',
   'card_not_in_hand',
+  'same_card',
   'not_your_turn',
   'illegal_bet',
   'insufficient_stack',
@@ -52,60 +64,73 @@ const SERVER_ERRORS = [
   'not_in_hand',
 ] as const satisfies readonly ServerError[];
 
-const CardSchema: z.ZodType<Card> = z.object({
+export const CardSchema: z.ZodType<Card> = z.object({
   element: z.enum(ELEMENTS),
   power: z.number().int().min(MIN_POWER).max(MAX_POWER),
 });
 
+const DecisionSchema: z.ZodType<Decision> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('stay'), cast: CardSchema, show: CardSchema }),
+  z.object({ kind: z.literal('skip') }),
+]);
+
 const SeatCardSchema = z.object({ seat: z.number().int(), card: CardSchema });
 
-const RoundResultSchema: z.ZodType<RoundResult> = z.object({
-  round: z.number().int(),
-  catalyst: CardSchema,
-  casts: z.array(SeatCardSchema),
-  burned: z.array(z.number().int()),
-  winner: z.number().int().nullable(),
-  value: z.number().int(),
+const CombinationSchema: z.ZodType<Combination> = z.object({
+  category: z.enum(CATEGORIES),
+  cards: z.array(CardSchema),
+  key: z.array(z.number().int()),
 });
 
-const HandOutcomeSchema: z.ZodType<HandOutcome> = z.object({
-  reason: z.enum(['fold', 'showdown']),
-  scores: z.array(
-    z.object({
-      seat: z.number().int(),
-      sigils: z.number().int(),
-      recipes: z.array(z.enum(['essence', 'chain'])),
-      score: z.number().int(),
-    }),
-  ),
+const SeatCombinationSchema = z.object({ seat: z.number().int(), combination: CombinationSchema });
+
+const Round1ResultSchema: z.ZodType<Round1Result> = z.object({
+  table: z.array(CardSchema),
+  pot: z.number().int(),
+  stayers: z.array(z.number().int()),
+  shown: z.array(SeatCardSchema),
+  casts: z.array(SeatCardSchema),
+  combinations: z.array(SeatCombinationSchema),
   winners: z.array(z.number().int()),
   payouts: z.array(z.number().int()),
-  shownReserves: z.array(z.object({ seat: z.number().int(), reserve: z.array(CardSchema) })),
-  stones: z.array(z.object({ seat: z.number().int(), power: z.number().int() })),
+  rolledOver: z.boolean(),
+});
+
+const FinalResultSchema: z.ZodType<FinalResult> = z.object({
+  reason: z.enum(['fold', 'showdown']),
+  table: z.array(CardSchema),
+  pot: z.number().int(),
+  casts: z.array(SeatCardSchema),
+  combinations: z.array(SeatCombinationSchema),
+  winners: z.array(z.number().int()),
+  payouts: z.array(z.number().int()),
 });
 
 const HandEventSchema: z.ZodType<HandEvent> = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('roundStarted'), round: z.number().int() }),
+  z.object({ type: z.literal('round1Started'), table: z.array(CardSchema) }),
+  z.object({ type: z.literal('decisionLocked'), seat: z.number().int() }),
+  z.object({ type: z.literal('round1Resolved'), result: Round1ResultSchema }),
+  z.object({ type: z.literal('finalStarted'), table: z.array(CardSchema) }),
   z.object({ type: z.literal('castLocked'), seat: z.number().int() }),
-  z.object({ type: z.literal('catalyst'), card: CardSchema }),
   z.object({ type: z.literal('betPlaced'), seat: z.number().int(), kind: z.enum(BET_KINDS), amount: z.number().int() }),
-  z.object({ type: z.literal('revealed'), result: RoundResultSchema }),
-  z.object({ type: z.literal('handEnded'), outcome: HandOutcomeSchema }),
+  z.object({ type: z.literal('handEnded'), result: FinalResultSchema }),
 ]);
 
 const HandViewSchema: z.ZodType<HandView> = z.object({
-  round: z.number().int(),
-  phase: z.enum(['cast', 'bet', 'reveal', 'roundEnd', 'done']),
+  phase: z.enum(['decide', 'round1End', 'cast', 'bet', 'reveal', 'done']),
   button: z.number().int(),
-  pot: z.number().int(),
+  round1Pot: z.number().int(),
+  finalPot: z.number().int(),
+  table: z.array(CardSchema),
   deckCount: z.number().int(),
-  catalyst: CardSchema.nullable(),
   players: z.array(
     z.object({
       id: z.string(),
       stack: z.number().int(),
-      sigils: z.number().int(),
-      casts: z.array(CardSchema),
+      handCount: z.number().int(),
+      decided: z.boolean(),
+      stayed: z.boolean().nullable(),
+      shown: CardSchema.nullable(),
       castLocked: z.boolean(),
       folded: z.boolean(),
       committed: z.number().int(),
@@ -121,15 +146,18 @@ const HandViewSchema: z.ZodType<HandView> = z.object({
       actor: z.number().int().nullable(),
     })
     .nullable(),
-  results: z.array(RoundResultSchema),
-  outcome: HandOutcomeSchema.nullable(),
+  round1: Round1ResultSchema.nullable(),
+  final: FinalResultSchema.nullable(),
   you: z
     .object({
       seat: z.number().int(),
       hand: z.array(CardSchema),
+      decision: DecisionSchema.nullable(),
       pendingCast: CardSchema.nullable(),
+      canDecide: z.boolean(),
       canCast: z.boolean(),
       legalBets: z.array(z.enum(BET_KINDS)),
+      options: z.array(z.object({ card: CardSchema, combination: CombinationSchema })),
     })
     .nullable(),
 });
@@ -153,12 +181,19 @@ const TableViewSchema: z.ZodType<TableView> = z.object({
   timeLeftMs: z.number().int().nullable(),
 });
 
+export const LobbyTableSchema: z.ZodType<LobbyTable> = z.object({
+  code: z.string(),
+  players: z.number().int(),
+  maxPlayers: z.number().int(),
+});
+
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hello'), token: z.string().min(8).max(64), name: z.string().trim().min(1).max(20) }),
   z.object({ type: z.literal('create'), maxPlayers: z.number().int().min(MIN_PLAYERS).max(MAX_PLAYERS) }),
   z.object({ type: z.literal('join'), code: z.string().min(1).max(8) }),
   z.object({ type: z.literal('leave') }),
   z.object({ type: z.literal('addBot') }),
+  z.object({ type: z.literal('decide'), decision: DecisionSchema }),
   z.object({ type: z.literal('cast'), card: CardSchema }),
   z.object({ type: z.literal('bet'), kind: z.enum(BET_KINDS) }),
 ]);
@@ -166,10 +201,7 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
 export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('welcome'), playerId: z.string(), name: z.string() }),
-  z.object({
-    type: z.literal('lobby'),
-    tables: z.array(z.object({ code: z.string(), players: z.number().int(), maxPlayers: z.number().int() })),
-  }),
+  z.object({ type: z.literal('lobby'), tables: z.array(LobbyTableSchema) }),
   z.object({ type: z.literal('table'), view: TableViewSchema, events: z.array(HandEventSchema) }),
   z.object({ type: z.literal('left') }),
   z.object({ type: z.literal('error'), reason: z.enum(SERVER_ERRORS) }),

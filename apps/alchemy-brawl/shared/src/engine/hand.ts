@@ -1,36 +1,40 @@
 import { ELEMENTS, sameCard, type Card } from '../cards.ts';
-import type { Rules } from '../config.ts';
-import { compareReserves, recipesOf, resolveRound, stonePower } from './scoring.ts';
+import { MIN_PLAYERS, round1Pot, type Rules } from '../config.ts';
+import { bestCombination, winnersOf } from './scoring.ts';
 import type {
   BetKind,
+  Decision,
+  FinalResult,
   HandAction,
   HandEvent,
-  HandOutcome,
-  HandPlayer,
   HandState,
+  Round1Result,
   SeatCard,
-  SeatScore,
+  SeatCombination,
   StepError,
   StepResult,
 } from './types.ts';
 
-export const ROUNDS = 3;
+export const CARDS_PER_PLAYER = 4;
+export const TABLE_CARDS = 5;
+export const ROUND1_TABLE = 2;
+export const FINAL_TABLE = 3;
 const INITIAL_HAND = 3;
-const CARDS_PER_PLAYER = INITIAL_HAND + ROUNDS;
 
 export type SeatStake = { id: string; stack: number };
 
 // The deck comes in already shuffled, so the engine stays pure: the caller owns the seed.
 export function startHand(rules: Rules, seats: SeatStake[], button: number, deck: Card[]): StepResult {
-  if (seats.length < 2) {
+  if (seats.length < MIN_PLAYERS) {
     return { ok: false, reason: 'not_enough_players' };
   }
-  if (deck.length < seats.length * CARDS_PER_PLAYER + ROUNDS) {
+  if (deck.length < seats.length * CARDS_PER_PLAYER + TABLE_CARDS) {
     return { ok: false, reason: 'deck_too_small' };
   }
   if (seats.some((seat) => seat.stack < rules.ante)) {
     return { ok: false, reason: 'insufficient_stack' };
   }
+  const first = round1Pot(rules, seats.length);
   const state: HandState = {
     rules,
     button: button % seats.length,
@@ -38,25 +42,29 @@ export function startHand(rules: Rules, seats: SeatStake[], button: number, deck
       id: seat.id,
       stack: seat.stack - rules.ante,
       hand: [],
-      casts: [],
+      decision: null,
+      shown: null,
       pendingCast: null,
       folded: false,
       committed: rules.ante,
       roundCommitted: 0,
-      sigils: 0,
     })),
     deck: [...deck],
-    round: 0,
-    phase: 'cast',
-    catalyst: null,
-    pot: rules.ante * seats.length,
+    phase: 'decide',
+    round1Pot: first,
+    finalPot: rules.ante * seats.length - first,
+    table: [],
     betting: null,
-    results: [],
-    outcome: null,
+    round1: null,
+    final: null,
   };
   const events: HandEvent[] = [];
-  const error = dealInitial(state) ?? beginRound(state, 1, events);
-  return error === null ? { ok: true, state, events } : { ok: false, reason: error };
+  const error = dealInitial(state) ?? turnTable(state, ROUND1_TABLE);
+  if (error !== null) {
+    return { ok: false, reason: error };
+  }
+  events.push({ type: 'round1Started', table: [...state.table] });
+  return { ok: true, state, events };
 }
 
 export function step(state: HandState, action: HandAction): StepResult {
@@ -76,14 +84,6 @@ export function legalBets(state: HandState, seat: number): BetKind[] {
   return betting.level === player.roundCommitted ? ['check', ...raise] : ['fold', 'call', ...raise];
 }
 
-export function betUnit(state: HandState): number {
-  return state.round === ROUNDS ? state.rules.bigBet : state.rules.smallBet;
-}
-
-export function roundValue(rules: Rules, round: number): number {
-  return round === ROUNDS ? rules.finalRoundValue : 1;
-}
-
 export function lowestCard(hand: Card[]): Card | null {
   let lowest: Card | null = null;
   for (const card of hand) {
@@ -99,14 +99,18 @@ export function lowestCard(hand: Card[]): Card | null {
 }
 
 export function activeOrder(state: HandState, start: number): number[] {
+  return seatsFrom(state, start).filter((seat) => state.players[seat]?.folded === false);
+}
+
+function seatsFrom(state: HandState, start: number): number[] {
   const count = state.players.length;
-  return Array.from({ length: count }, (_, i) => (start + i) % count).filter(
-    (seat) => state.players[seat]?.folded === false,
-  );
+  return Array.from({ length: count }, (_, i) => (start + i) % count);
 }
 
 function apply(state: HandState, action: HandAction, events: HandEvent[]): StepError | null {
   switch (action.type) {
+    case 'decide':
+      return decide(state, action.seat, action.decision, events);
     case 'cast':
       return cast(state, action.seat, action.card, events);
     case 'bet':
@@ -121,10 +125,10 @@ function apply(state: HandState, action: HandAction, events: HandEvent[]): StepE
 function clone(state: HandState): HandState {
   return {
     ...state,
-    players: state.players.map((player) => ({ ...player, hand: [...player.hand], casts: [...player.casts] })),
+    players: state.players.map((player) => ({ ...player, hand: [...player.hand] })),
     deck: [...state.deck],
+    table: [...state.table],
     betting: state.betting === null ? null : { ...state.betting, toAct: [...state.betting.toAct] },
-    results: [...state.results],
   };
 }
 
@@ -153,20 +157,103 @@ function dealInitial(state: HandState): StepError | null {
   return null;
 }
 
-function beginRound(state: HandState, round: number, events: HandEvent[]): StepError | null {
-  state.round = round;
-  state.phase = 'cast';
-  state.catalyst = null;
-  for (const player of state.players) {
-    player.roundCommitted = 0;
+function turnTable(state: HandState, count: number): StepError | null {
+  const table = state.deck.splice(0, count);
+  if (table.length < count) {
+    return 'deck_too_small';
   }
+  state.table = table;
+  return null;
+}
+
+function decide(state: HandState, seat: number, decision: Decision, events: HandEvent[]): StepError | null {
+  if (state.phase !== 'decide') {
+    return 'wrong_phase';
+  }
+  const player = state.players[seat];
+  if (player === undefined) {
+    return 'unknown_seat';
+  }
+  if (player.decision !== null) {
+    return 'already_decided';
+  }
+  if (decision.kind === 'skip') {
+    player.decision = decision;
+  } else {
+    const castIndex = player.hand.findIndex((held) => sameCard(held, decision.cast));
+    const castCard = player.hand[castIndex];
+    const showCard = player.hand.find((held) => sameCard(held, decision.show));
+    if (castCard === undefined || showCard === undefined) {
+      return 'card_not_in_hand';
+    }
+    if (sameCard(castCard, showCard)) {
+      return 'same_card';
+    }
+    player.hand.splice(castIndex, 1);
+    player.decision = { kind: 'stay', cast: castCard, show: showCard };
+    player.shown = showCard;
+  }
+  events.push({ type: 'decisionLocked', seat });
+  if (state.players.every((p) => p.decision !== null)) {
+    resolveRound1(state, events);
+  }
+  return null;
+}
+
+function resolveRound1(state: HandState, events: HandEvent[]): void {
+  const pot = state.round1Pot;
+  const stayers: number[] = [];
+  const shown: SeatCard[] = [];
+  const casts: SeatCard[] = [];
+  state.players.forEach((player, seat) => {
+    if (player.decision?.kind === 'stay') {
+      stayers.push(seat);
+      shown.push({ seat, card: player.decision.show });
+      casts.push({ seat, card: player.decision.cast });
+    }
+  });
+  let result: Round1Result;
+  const base = { table: [...state.table], pot, stayers, shown };
+  if (stayers.length === 0) {
+    state.finalPot += pot;
+    result = {
+      ...base,
+      casts: [],
+      combinations: [],
+      winners: [],
+      payouts: state.players.map(() => 0),
+      rolledOver: true,
+    };
+  } else if (stayers.length === 1) {
+    const winners = [...stayers];
+    result = { ...base, casts: [], combinations: [], winners, payouts: payOut(state, pot, winners), rolledOver: false };
+  } else {
+    const combinations = casts.map((entry) => ({
+      seat: entry.seat,
+      combination: bestCombination(entry.card, state.table),
+    }));
+    const winners = winnersOf(combinations);
+    result = { ...base, casts, combinations, winners, payouts: payOut(state, pot, winners), rolledOver: false };
+  }
+  state.round1Pot = 0;
+  state.round1 = result;
+  state.phase = 'round1End';
+  events.push({ type: 'round1Resolved', result });
+}
+
+function startFinal(state: HandState, events: HandEvent[]): StepError | null {
   for (const seat of activeOrder(state, state.button + 1)) {
     const error = drawCard(state, seat);
     if (error !== null) {
       return error;
     }
   }
-  events.push({ type: 'roundStarted', round });
+  const error = turnTable(state, FINAL_TABLE);
+  if (error !== null) {
+    return error;
+  }
+  state.phase = 'cast';
+  events.push({ type: 'finalStarted', table: [...state.table] });
   return null;
 }
 
@@ -193,22 +280,10 @@ function cast(state: HandState, seat: number, card: Card, events: HandEvent[]): 
   player.pendingCast = held;
   events.push({ type: 'castLocked', seat });
   const waiting = activeOrder(state, 0).some((s) => state.players[s]?.pendingCast === null);
-  return waiting ? null : flipCatalyst(state, events);
-}
-
-function flipCatalyst(state: HandState, events: HandEvent[]): StepError | null {
-  const catalyst = state.deck.shift();
-  if (catalyst === undefined) {
-    return 'deck_too_small';
+  if (!waiting) {
+    state.phase = 'bet';
+    state.betting = { level: 0, bets: 0, toAct: activeOrder(state, state.button + 1) };
   }
-  state.catalyst = catalyst;
-  events.push({ type: 'catalyst', card: catalyst });
-  if (state.round === 1) {
-    state.phase = 'reveal';
-    return null;
-  }
-  state.phase = 'bet';
-  state.betting = { level: 0, bets: 0, toAct: activeOrder(state, state.button + 1) };
   return null;
 }
 
@@ -234,25 +309,26 @@ function bet(state: HandState, seat: number, kind: BetKind, events: HandEvent[])
     betting.toAct.shift();
   } else {
     const aggressive = kind === 'bet' || kind === 'raise';
-    if (aggressive) {
-      betting.level += betUnit(state);
-      betting.bets += 1;
-    }
-    amount = betting.level - player.roundCommitted;
+    const level = aggressive ? betting.level + state.rules.finalBet : betting.level;
+    amount = level - player.roundCommitted;
     if (amount > player.stack) {
       return 'insufficient_stack';
+    }
+    if (aggressive) {
+      betting.level = level;
+      betting.bets += 1;
     }
     player.stack -= amount;
     player.committed += amount;
     player.roundCommitted += amount;
-    state.pot += amount;
+    state.finalPot += amount;
     betting.toAct = aggressive ? activeOrder(state, seat + 1).filter((s) => s !== seat) : betting.toAct.slice(1);
   }
   events.push({ type: 'betPlaced', seat, kind, amount });
 
   const [last, ...others] = activeOrder(state, 0);
   if (last !== undefined && others.length === 0) {
-    finish(state, { reason: 'fold', scores: [], shownReserves: [], winners: [last] }, events);
+    finish(state, { reason: 'fold', casts: [], combinations: [], winners: [last] }, events);
     return null;
   }
   if (betting.toAct.length === 0) {
@@ -263,6 +339,15 @@ function bet(state: HandState, seat: number, kind: BetKind, events: HandEvent[])
 }
 
 function timeout(state: HandState, events: HandEvent[]): StepError | null {
+  if (state.phase === 'decide') {
+    for (const player of state.players) {
+      if (player.decision === null) {
+        player.decision = { kind: 'skip' };
+      }
+    }
+    resolveRound1(state, events);
+    return null;
+  }
   if (state.phase === 'cast') {
     for (const seat of activeOrder(state, state.button + 1)) {
       const player = state.players[seat];
@@ -287,105 +372,60 @@ function timeout(state: HandState, events: HandEvent[]): StepError | null {
 }
 
 function advance(state: HandState, events: HandEvent[]): StepError | null {
-  if (state.phase === 'reveal') {
-    return reveal(state, events);
+  if (state.phase === 'round1End') {
+    return startFinal(state, events);
   }
-  if (state.phase === 'roundEnd') {
-    if (state.round < ROUNDS) {
-      return beginRound(state, state.round + 1, events);
-    }
+  if (state.phase === 'reveal') {
     showdown(state, events);
     return null;
   }
   return 'wrong_phase';
 }
 
-function reveal(state: HandState, events: HandEvent[]): StepError | null {
-  const catalyst = state.catalyst;
-  if (catalyst === null) {
-    return 'wrong_phase';
-  }
+function showdown(state: HandState, events: HandEvent[]): void {
   const casts: SeatCard[] = [];
   state.players.forEach((player, seat) => {
     if (!player.folded && player.pendingCast !== null) {
       casts.push({ seat, card: player.pendingCast });
-      player.casts.push(player.pendingCast);
-      player.pendingCast = null;
     }
   });
-  const value = roundValue(state.rules, state.round);
-  const { burned, winner } = resolveRound(casts, catalyst.element);
-  const winning = winner === null ? undefined : state.players[winner];
-  if (winning !== undefined) {
-    winning.sigils += value;
-  }
-  const result = { round: state.round, catalyst, casts, burned, winner, value };
-  state.results.push(result);
-  state.phase = 'roundEnd';
-  events.push({ type: 'revealed', result });
-  return null;
+  const combinations: SeatCombination[] = casts.map((entry) => ({
+    seat: entry.seat,
+    combination: bestCombination(entry.card, state.table),
+  }));
+  finish(state, { reason: 'showdown', casts, combinations, winners: winnersOf(combinations) }, events);
 }
 
-function showdown(state: HandState, events: HandEvent[]): void {
-  const scores: SeatScore[] = [];
-  const reserves = new Map<number, Card[]>();
-  for (const seat of activeOrder(state, state.button + 1)) {
-    const player = state.players[seat];
-    if (player !== undefined) {
-      const counted = state.rules.burnedCountsForRecipes
-        ? player.casts
-        : player.casts.filter((_, i) => state.results[i]?.burned.includes(seat) !== true);
-      const recipes = recipesOf(counted);
-      scores.push({ seat, sigils: player.sigils, recipes, score: player.sigils + recipes.length });
-      reserves.set(seat, player.hand);
-    }
-  }
-  const top = Math.max(...scores.map((s) => s.score));
-  const tied = scores.filter((s) => s.score === top).map((s) => s.seat);
-  const reserveOf = (seat: number): Card[] => reserves.get(seat) ?? [];
-  let winners: number[] = [];
-  for (const seat of tied) {
-    const best = winners[0];
-    const diff = best === undefined ? 1 : compareReserves(reserveOf(seat), reserveOf(best));
-    if (diff > 0) {
-      winners = [seat];
-    } else if (diff === 0) {
-      winners.push(seat);
-    }
-  }
-  const shownReserves = tied.length > 1 ? tied.map((seat) => ({ seat, reserve: reserveOf(seat) })) : [];
-  finish(state, { reason: 'showdown', scores, shownReserves, winners }, events);
-}
+type Settlement = Pick<FinalResult, 'reason' | 'casts' | 'combinations' | 'winners'>;
 
-type Settlement = Pick<HandOutcome, 'reason' | 'scores' | 'shownReserves' | 'winners'>;
-
-// The pot is split evenly; odd chips go one each to the winners nearest the button, clockwise.
 function finish(state: HandState, settlement: Settlement, events: HandEvent[]): void {
-  const winners = activeOrder(state, state.button + 1).filter((seat) => settlement.winners.includes(seat));
-  const share = Math.floor(state.pot / winners.length);
-  const oddChips = state.pot - share * winners.length;
+  const pot = state.finalPot;
+  const payouts = payOut(state, pot, settlement.winners);
+  const result: FinalResult = { ...settlement, table: [...state.table], pot, payouts };
+  state.finalPot = 0;
+  state.betting = null;
+  state.phase = 'done';
+  state.final = result;
+  events.push({ type: 'handEnded', result });
+}
+
+// The pot is split evenly, rounded down once; odd units go one each to the winners nearest
+// the button, clockwise from button+1 (spec §4.6). Stacks are credited here.
+function payOut(state: HandState, pot: number, winners: number[]): number[] {
+  const ordered = seatsFrom(state, state.button + 1).filter((seat) => winners.includes(seat));
   const payouts = state.players.map(() => 0);
-  winners.forEach((seat, i) => {
-    const payout = share + (i < oddChips ? 1 : 0);
+  if (ordered.length === 0) {
+    return payouts;
+  }
+  const share = Math.floor(pot / ordered.length);
+  const odd = pot - share * ordered.length;
+  ordered.forEach((seat, i) => {
+    const payout = share + (i < odd ? 1 : 0);
     payouts[seat] = payout;
     const player = state.players[seat];
     if (player !== undefined) {
       player.stack += payout;
     }
   });
-  const stones = activeOrder(state, 0).flatMap((seat) => {
-    const player = state.players[seat];
-    const power = player === undefined ? null : stonePower(received(player));
-    return power === null ? [] : [{ seat, power }];
-  });
-  const outcome: HandOutcome = { ...settlement, winners, payouts, stones };
-  state.pot = 0;
-  state.betting = null;
-  state.phase = 'done';
-  state.outcome = outcome;
-  events.push({ type: 'handEnded', outcome });
-}
-
-function received(player: HandPlayer): Card[] {
-  return [...player.casts, ...(player.pendingCast === null ? [] : [player.pendingCast]), ...player.hand];
+  return payouts;
 }

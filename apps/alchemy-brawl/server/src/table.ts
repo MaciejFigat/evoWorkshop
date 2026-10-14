@@ -8,6 +8,7 @@ import {
   viewFor,
   type BetKind,
   type Card,
+  type Decision,
   type HandAction,
   type HandEvent,
   type HandState,
@@ -21,16 +22,19 @@ import {
 import { mulberry32, type Rng } from '@evo/rng';
 import { chooseBotMove } from './bot.ts';
 
-// Pauses that give the client time to play the Catalyst flip, the reveal and the payout.
+// Pauses that give the client time to play the Round 1 show, the reveal and the payout.
 export const START_DELAY_MS = 1_500;
-export const REVEAL_DELAY_MS = 1_500;
-export const ROUND_END_DELAY_MS = 3_000;
+export const ROUND1_END_DELAY_MS = 4_000;
+export const REVEAL_DELAY_MS = 2_000;
 export const NEXT_HAND_DELAY_MS = 5_000;
 const BOT_MIN_DELAY_MS = 600;
 const BOT_EXTRA_DELAY_MS = 900;
 const SEED_RANGE = 2 ** 31;
 
-export type PlayerMove = { type: 'cast'; card: Card } | { type: 'bet'; kind: BetKind };
+export type PlayerMove =
+  | { type: 'decide'; decision: Decision }
+  | { type: 'cast'; card: Card }
+  | { type: 'bet'; kind: BetKind };
 
 export type TableHooks = {
   deliver: (playerId: string, message: ServerMessage) => void;
@@ -81,6 +85,9 @@ export class Table {
   }
 
   join(id: string, name: string): ServerError | null {
+    if (this.seats.some((s) => s.id === id)) {
+      return 'already_seated';
+    }
     if (this.info().players >= this.config.maxPlayers) {
       return 'table_full';
     }
@@ -119,9 +126,15 @@ export class Table {
     this.broadcast([]);
   }
 
+  // A seat that reconnects while a finished hand is still on the table gets its handEnded again,
+  // so the round telemetry for that hand is not lost.
   setConnected(id: string, connected: boolean): void {
     this.seats = this.seats.map((s) => (s.id === id ? { ...s, connected } : s));
     this.broadcast([]);
+    const hand = this.hand;
+    if (connected && hand !== null && hand.phase === 'done' && hand.final !== null) {
+      this.hooks.deliver(id, { type: 'table', view: this.viewOf(id), events: [{ type: 'handEnded', result: hand.final }] });
+    }
   }
 
   act(id: string, move: PlayerMove): ServerError | null {
@@ -175,11 +188,12 @@ export class Table {
   }
 
   private apply(result: Extract<StepResult, { ok: true }>): void {
+    const phaseChanged = this.hand === null || this.hand.phase !== result.state.phase;
     this.hand = result.state;
     for (const player of result.state.players) {
       this.seats = this.seats.map((s) => (s.id === player.id ? { ...s, stack: player.stack } : s));
     }
-    this.schedule();
+    this.schedule(phaseChanged);
     this.broadcast(result.events);
   }
 
@@ -193,28 +207,37 @@ export class Table {
     }
   }
 
-  private schedule(): void {
-    this.clearTimers();
+  // The simultaneous windows (decide, cast) keep their clock while seats lock in; the betting
+  // clock restarts for every new actor.
+  private schedule(phaseChanged: boolean): void {
+    this.botTimers.forEach(clearTimeout);
+    this.botTimers = [];
     const hand = this.hand;
     if (hand === null) {
       return;
     }
-    switch (hand.phase) {
-      case 'cast':
-        this.startClock(this.config.castTimerMs);
-        break;
-      case 'bet':
-        this.startClock(this.config.actionTimerMs);
-        break;
-      case 'reveal':
-        this.timer = setTimeout(() => this.engineStep({ type: 'advance' }), REVEAL_DELAY_MS);
-        break;
-      case 'roundEnd':
-        this.timer = setTimeout(() => this.engineStep({ type: 'advance' }), ROUND_END_DELAY_MS);
-        break;
-      case 'done':
-        this.timer = setTimeout(() => this.dealNextHand(), NEXT_HAND_DELAY_MS);
-        break;
+    if (phaseChanged || hand.phase === 'bet') {
+      this.clearPhaseTimer();
+      switch (hand.phase) {
+        case 'decide':
+          this.startClock(this.config.decideTimerMs);
+          break;
+        case 'cast':
+          this.startClock(this.config.castTimerMs);
+          break;
+        case 'bet':
+          this.startClock(this.config.actionTimerMs);
+          break;
+        case 'round1End':
+          this.timer = setTimeout(() => this.engineStep({ type: 'advance' }), ROUND1_END_DELAY_MS);
+          break;
+        case 'reveal':
+          this.timer = setTimeout(() => this.engineStep({ type: 'advance' }), REVEAL_DELAY_MS);
+          break;
+        case 'done':
+          this.timer = setTimeout(() => this.dealNextHand(), NEXT_HAND_DELAY_MS);
+          break;
+      }
     }
     this.scheduleBots(hand);
   }
@@ -226,11 +249,13 @@ export class Table {
 
   private scheduleBots(hand: HandState): void {
     const waiting =
-      hand.phase === 'cast'
-        ? hand.players.filter((p) => !p.folded && p.pendingCast === null).map((p) => p.id)
-        : hand.phase === 'bet' && hand.betting !== null
-          ? hand.betting.toAct.slice(0, 1).flatMap((seat) => hand.players[seat]?.id ?? [])
-          : [];
+      hand.phase === 'decide'
+        ? hand.players.filter((p) => p.decision === null).map((p) => p.id)
+        : hand.phase === 'cast'
+          ? hand.players.filter((p) => !p.folded && p.pendingCast === null).map((p) => p.id)
+          : hand.phase === 'bet' && hand.betting !== null
+            ? hand.betting.toAct.slice(0, 1).flatMap((seat) => hand.players[seat]?.id ?? [])
+            : [];
     for (const id of waiting) {
       const rng = this.seats.find((s) => s.id === id)?.bot;
       if (rng !== undefined && rng !== null) {
@@ -252,14 +277,18 @@ export class Table {
     }
   }
 
-  private clearTimers(): void {
+  private clearPhaseTimer(): void {
     if (this.timer !== null) {
       clearTimeout(this.timer);
     }
-    this.botTimers.forEach(clearTimeout);
     this.timer = null;
-    this.botTimers = [];
     this.deadline = null;
+  }
+
+  private clearTimers(): void {
+    this.clearPhaseTimer();
+    this.botTimers.forEach(clearTimeout);
+    this.botTimers = [];
   }
 
   private broadcast(events: HandEvent[]): void {

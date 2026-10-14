@@ -1,66 +1,72 @@
 import { describe, expect, it } from 'vitest';
-import { compareReserves, recipesOf, resolveRound, stonePower } from './scoring.ts';
+import { CATEGORY_RANK, bestCombination, compareCombinations, rankThree, winnersOf } from './scoring.ts';
 import { card, cards } from './testDeck.ts';
+import { CATEGORIES } from './types.ts';
 
-const casts = (labels: string) => cards(labels).map((c, seat) => ({ seat, card: c }));
+function rank(labels: string) {
+  const [a, b, c] = cards(labels);
+  if (a === undefined || b === undefined || c === undefined) {
+    throw new Error(`need three cards: ${labels}`);
+  }
+  return rankThree(a, b, c);
+}
 
-describe('resolveRound', () => {
-  it('burns equal powers regardless of element', () => {
-    expect(resolveRound(casts('9F 9W 5E'), 'air')).toEqual({ burned: [0, 1], winner: 2 });
+describe('rankThree', () => {
+  it('ranks categories by their index in CATEGORIES', () => {
+    CATEGORIES.forEach((category, i) => expect(CATEGORY_RANK[category]).toBe(i));
   });
 
-  it('lets any Catalyst-element card beat every other element', () => {
-    expect(resolveRound(casts('13A 2F 8W'), 'fire')).toEqual({ burned: [], winner: 1 });
+  it('names every category with its key, cast first', () => {
+    expect(rank('5F 6F 7F')).toMatchObject({ category: 'straightFlush', key: [5, 7] });
+    expect(rank('9W 9F 9A')).toMatchObject({ category: 'three', key: [4, 9] });
+    expect(rank('9A 10A 11E')).toMatchObject({ category: 'straight', key: [3, 11] });
+    expect(rank('10F 3F 6F')).toMatchObject({ category: 'flush', key: [2, 10, 6, 3] });
+    expect(rank('4W 4E 11A')).toMatchObject({ category: 'pair', key: [1, 4, 11] });
+    expect(rank('11A 4W 4E')).toMatchObject({ category: 'pair', key: [1, 4, 11] });
+    expect(rank('3E 10A 11E')).toMatchObject({ category: 'high', key: [0, 11, 10, 3] });
+    expect(rank('3E 10A 11E').cards).toEqual(cards('3E 10A 11E'));
   });
 
-  it('applies collision before the Catalyst', () => {
-    expect(resolveRound(casts('8F 8W 3E'), 'fire')).toEqual({ burned: [0, 1], winner: 2 });
+  it('puts a straight above a flush', () => {
+    expect(compareCombinations(rank('1W 2F 3E'), rank('13F 12F 2F'))).toBeGreaterThan(0);
   });
 
-  it('has no winner when everything burns', () => {
-    expect(resolveRound(casts('4F 4W 4E 4A'), 'air')).toEqual({ burned: [0, 1, 2, 3], winner: null });
-  });
-});
-
-describe('recipesOf', () => {
-  it('finds Essence', () => {
-    expect(recipesOf(cards('6F 8F 4F'))).toEqual(['essence']);
+  it('does not wrap: 12-13-1 is a high card, 1-2-3 is a straight', () => {
+    expect(rank('12F 13W 1E').category).toBe('high');
+    expect(rank('1F 2W 3E').category).toBe('straight');
+    expect(rank('11F 12F 13F').category).toBe('straightFlush');
   });
 
-  it('finds a Chain Reaction in any order and any elements', () => {
-    expect(recipesOf(cards('11W 13A 12W'))).toEqual(['chain']);
-  });
-
-  it('does not wrap a chain around', () => {
-    expect(recipesOf(cards('12F 13W 1E'))).toEqual([]);
-  });
-
-  it('counts a same-element chain twice', () => {
-    expect(recipesOf(cards('4E 5E 6E'))).toEqual(['essence', 'chain']);
-  });
-
-  it('needs all three casts', () => {
-    expect(recipesOf(cards('4E 5E'))).toEqual([]);
-  });
-});
-
-describe('compareReserves', () => {
-  it('compares the highest card first', () => {
-    expect(compareReserves(cards('13F 7W 3E'), cards('12F 12W 5E'))).toBeGreaterThan(0);
-  });
-
-  it('falls through to the second card', () => {
-    expect(compareReserves(cards('12A 7W 3E'), cards('12F 12W 5E'))).toBeLessThan(0);
-  });
-
-  it('ignores elements', () => {
-    expect(compareReserves(cards('9F 5W 2E'), cards('9A 5E 2W'))).toBe(0);
+  it('compares equal combinations as 0 regardless of element', () => {
+    expect(compareCombinations(rank('7F 6F 3F'), rank('7W 6W 3W'))).toBe(0);
+    expect(compareCombinations(rank('9A 10A 11E'), rank('9F 10W 11E'))).toBe(0);
+    expect(compareCombinations(rank('10F 6F 3F'), rank('7F 6F 3F'))).toBeGreaterThan(0);
+    expect(compareCombinations(rank('4W 4E 11A'), rank('4W 4E 12A'))).toBeLessThan(0);
   });
 });
 
-describe('stonePower', () => {
-  it('detects four of one power among the six cards', () => {
-    expect(stonePower([...cards('9F 9W 9E 9A 1F'), card('2W')])).toBe(9);
-    expect(stonePower(cards('9F 9W 9E 8A 1F 2W'))).toBeNull();
+describe('bestCombination', () => {
+  it('uses both cards of a two-card table', () => {
+    expect(bestCombination(card('9A'), cards('10A 11E'))).toMatchObject({ category: 'straight', key: [3, 11] });
+  });
+
+  it('picks the best pair of three table cards', () => {
+    const best = bestCombination(card('10F'), cards('3F 6F 9E'));
+    expect(best).toMatchObject({ category: 'flush', key: [2, 10, 6, 3] });
+    expect(best.cards).toEqual(cards('10F 3F 6F'));
+    expect(bestCombination(card('6W'), cards('3F 6F 9E'))).toMatchObject({ category: 'pair', key: [1, 6, 9] });
+    expect(bestCombination(card('8W'), cards('7F 9F 8E'))).toMatchObject({ category: 'straight', key: [3, 9] });
+  });
+});
+
+describe('winnersOf', () => {
+  it('returns every tied seat in input order', () => {
+    const winners = winnersOf([
+      { seat: 2, combination: rank('7W 6F 3F') },
+      { seat: 0, combination: rank('7F 6F 3F') },
+      { seat: 1, combination: rank('7A 6A 3A') },
+    ]);
+    expect(winners).toEqual([0, 1]);
+    expect(winnersOf([])).toEqual([]);
   });
 });

@@ -1,0 +1,29 @@
+{
+  "name": "@evo/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch-path=src --watch-path=../alchemy-brawl/server/src --watch-path=../alchemy-brawl/shared/src --disable-warning=ExperimentalWarning src/server/main.ts",
+    "start": "NODE_ENV=production node --disable-warning=ExperimentalWarning src/server/main.ts",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@evo/brawl-server": "workspace:*",
+    "@evo/brawl-shared": "workspace:*",
+    "@evo/game-sdk": "workspace:*",
+    "@evo/protocol": "workspace:*",
+    "@evo/rng": "workspace:*",
+    "vite": "^8.3.0",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript7": "npm:typescript@^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
