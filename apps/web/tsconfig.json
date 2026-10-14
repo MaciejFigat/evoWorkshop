@@ -4,5 +4,5 @@
     "types": ["vite/client", "node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["games", "vite.config.ts"]
+  "include": ["../../games/*/main.ts", "vite.config.ts"]
 }

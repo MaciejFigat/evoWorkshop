@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 import { scanGames } from './src/server/catalog.ts';
 
-// The Vite root is the repository, so a game page can live in apps/web/games/<id>/ or in
-// apps/<id>/client/ and still be a build input; the server maps /games/<id>/ onto that folder.
+// The Vite root is the repository, so every games/<id>/ page is a build input and the
+// server maps /games/<id>/ onto that folder in dev and in dist.
 const repo = resolve(import.meta.dirname, '../..');
 const inputs = Object.fromEntries(scanGames(repo).games.map((game) => [game.rel, resolve(game.dir, game.manifest.entry)]));
 

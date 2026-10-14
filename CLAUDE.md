@@ -35,16 +35,16 @@ apps/web/                      @evo/web: the single server, http://localhost:518
   src/server/catalog.ts        scanGames(repo) → { games, errors }: the folder tree is the registry; catalogEntry(game) → urls
   src/server/*.ts              Node http + ws; Vite middleware mode in dev, apps/web/dist in prod
   pages/shell.html             EVO Playground pages: lobby, library grid, game page, stats, gamers board, add, my games; mock data inline
-  games/<id>/                  one folder per game page: manifest.json, index.html, main.ts, cover.svg
-  games/_template/             copied by yarn new-game; folders starting with "_" are not games
-  vite.config.ts               Vite root = repo root; every game page is a build input; outDir apps/web/dist; vitest over src
-  tsconfig.json                the game pages (DOM); tsconfig.server.json: src/server (Node, erasable syntax only)
-apps/alchemy-brawl/            Alchemy Brawl: a multiplayer table game with its own tables, one folder
-  spec.md                      the rules, v0.3
-  assets/                      SVG art: Cards, HUD, UI, Items, Props
-  shared/                      @evo/brawl-shared: pure hand engine, scoring, per-seat view, zod protocol
-  server/                      @evo/brawl-server: lobby, tables by code, timers, bots; mounted by apps/web on /ws
-  client/                      @evo/brawl-client: the game page at /games/alchemy-brawl/ (React lobby + CSS HUD, Phaser table)
+  vite.config.ts               Vite root = repo root; every games/<id>/ page is a build input; outDir apps/web/dist; vitest over src
+  tsconfig.json                typechecks games/*/main.ts (DOM); tsconfig.server.json: src/server (Node, erasable syntax only)
+games/                         every game, one folder each; the folder tree is the registry
+  <id>/                        a game page: manifest.json, index.html, main.ts, cover (d20, sunset-break, warsaw-streets)
+  _template/                   copied by yarn new-game; folders starting with "_" are not games
+  alchemy-brawl/               a game with its own tables, still one folder: @evo/alchemy-brawl
+    manifest.json index.html cover.svg spec.md assets/   the page, the rules (v0.3), the SVG art
+    src/                       the client: React lobby + CSS HUD, Phaser table
+    engine/                    @evo/alchemy-brawl/engine: pure hand engine, scoring, per-seat view, zod protocol
+    tables/                    @evo/alchemy-brawl/tables: lobby, tables by code, timers, bots; mounted by apps/web on /ws
 packages/protocol/             zod: manifest, host↔game messages; parseWith → { ok, value } | { ok, reason }
 packages/rng/                  mulberry32 → { next, int, shuffle }; the only place Math.random may appear
 packages/game-sdk/             connect(onInit): game:ready → host:init → session { seed, sessionId, sandbox, rng, emit }
@@ -52,14 +52,16 @@ scripts/new-game.mjs           yarn new-game <id> [Title]: copies the template, 
 docs/passports/<id>.md         one passport per game, written before its code
 ```
 
-A game that needs its own server and tables keeps one folder `apps/<id>/`, as
-`apps/alchemy-brawl/` does: `spec.md`, `assets/`, and three workspaces `shared` (pure engine
-and the zod protocol, used by both sides), `server` and `client`. The server has no process
-of its own: `apps/web` imports it and mounts it on `/ws`. The client is a game page at
-`/games/<id>/`, which the web server maps onto `apps/<id>/client/`; it opens from the library
-like any other game and still emits `round` through `@evo/game-sdk`, so the same telemetry
-covers it. The server owns every hidden card and sends each seat only its own view; the
-client renders that view and the events. The root `workspaces` lists `apps/<id>/*`.
+A game that needs its own server and tables is still one folder `games/<id>/`, as
+`games/alchemy-brawl/` is: the page (`manifest.json`, `index.html`, `src/`), `spec.md`,
+`assets/`, plus `engine/` (pure engine and the zod protocol, used by both sides) and
+`tables/` (lobby, seats, timers, bots). The folder is one workspace package with two entry
+points, `@evo/<id>/engine` and `@evo/<id>/tables`. The tables have no process of their own:
+`apps/web` imports them and mounts them on `/ws`. The page opens from the library like any
+other game and still emits `round` through `@evo/game-sdk`, so the same telemetry covers it.
+The tables own every hidden card and send each seat only its own view; the client renders
+that view and the events. The root `workspaces` lists `games/*`; a plain game page has no
+`package.json` and is not a workspace.
 
 ## Commands
 
@@ -90,8 +92,8 @@ inside that iframe.
 
 ## Game contract
 
-A game is a folder `apps/web/games/<id>/` (or `apps/<id>/client/` for a game with its own
-server) with `manifest.json`, `index.html`, `main.ts` (or `src/`) and a cover. Nothing else
+A game is a folder `games/<id>/` with `manifest.json`, `index.html`, `main.ts` (or `src/`
+for a game with its own tables) and a cover. Nothing else
 is registered: the server scans the folder tree (`catalog.ts`), and `yarn test` fails on a
 manifest that does not parse, an `id` that differs from the folder name, a missing `entry`
 or `cover`, or a duplicate id. Start a game with `yarn new-game <id>`; the template already
@@ -207,10 +209,10 @@ bonus features).
 - The stack is pinned: React + Vite, zod, vitest, ws for the server, Phaser for the board
   (tweens, particles, camera shake and flash, sprite-sheet animations are built in).
 - Servers run TypeScript directly on Node's type stripping, with no build step: this covers
-  `apps/web/src/server`, `apps/alchemy-brawl/server` and the shared code they load
-  (`apps/alchemy-brawl/shared`). Relative imports there carry the `.ts` extension, and only
+  `apps/web/src/server`, `games/alchemy-brawl/tables` and the engine they load
+  (`games/alchemy-brawl/engine`). Relative imports there carry the `.ts` extension, and only
   erasable syntax is allowed (no enums, namespaces or parameter properties);
-  `erasableSyntaxOnly` enforces it. Workspace imports use package names (`@evo/brawl-shared`,
+  `erasableSyntaxOnly` enforces it. Workspace imports use package names (`@evo/alchemy-brawl/engine`,
   `@evo/protocol`, `@evo/rng`, `@evo/game-sdk`).
   Ask before adding any new dependency.
 - No `any`, no non-null assertions, no `as` except at parsing boundaries. `as const` does not

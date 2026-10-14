@@ -2,8 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseManifest, type Manifest } from '@evo/protocol';
 
-// A game page is a folder with a manifest.json: either apps/web/games/<id>/ (folders starting
-// with "_" are templates, not games) or apps/<id>/client/ for a game with its own server.
+// A game is a folder games/<id>/ with a manifest.json; folders starting with "_" are templates, not games.
 export type GameFolder = { id: string; dir: string; rel: string; manifest: Manifest };
 
 export type CatalogError = { rel: string; reason: string };
@@ -64,14 +63,9 @@ function load(repo: string, rel: string, expectedId: string, into: Catalog): voi
 
 export function scanGames(repo: string): Catalog {
   const catalog: Catalog = { games: [], errors: [] };
-  for (const id of subdirs(resolve(repo, 'apps/web/games'))) {
+  for (const id of subdirs(resolve(repo, 'games'))) {
     if (!id.startsWith('_')) {
-      load(repo, `apps/web/games/${id}`, id, catalog);
-    }
-  }
-  for (const id of subdirs(resolve(repo, 'apps'))) {
-    if (id !== 'web') {
-      load(repo, `apps/${id}/client`, id, catalog);
+      load(repo, `games/${id}`, id, catalog);
     }
   }
   return catalog;

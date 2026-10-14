@@ -4,7 +4,7 @@
   "packageManager": "yarn@4.17.0",
   "workspaces": [
     "apps/*",
-    "apps/alchemy-brawl/*",
+    "games/*",
     "packages/*"
   ],
   "scripts": {

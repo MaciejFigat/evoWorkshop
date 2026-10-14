@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { LobbyTable } from '@evo/brawl-shared';
+import type { LobbyTable } from '@evo/alchemy-brawl/engine';
 import { catalogEntry, type Catalog } from './catalog.ts';
 
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {

@@ -3,15 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch-path=src --watch-path=../alchemy-brawl/server/src --watch-path=../alchemy-brawl/shared/src --disable-warning=ExperimentalWarning src/server/main.ts",
+    "dev": "node --watch-path=src --watch-path=../../games/alchemy-brawl/tables --watch-path=../../games/alchemy-brawl/engine --disable-warning=ExperimentalWarning src/server/main.ts",
     "start": "NODE_ENV=production node --disable-warning=ExperimentalWarning src/server/main.ts",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run"
   },
   "dependencies": {
-    "@evo/brawl-server": "workspace:*",
-    "@evo/brawl-shared": "workspace:*",
+    "@evo/alchemy-brawl": "workspace:*",
     "@evo/game-sdk": "workspace:*",
     "@evo/protocol": "workspace:*",
     "@evo/rng": "workspace:*",

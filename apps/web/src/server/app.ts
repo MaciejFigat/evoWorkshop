@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { Duplex } from 'node:stream';
-import type { LobbyTable, ServerMessage } from '@evo/brawl-shared';
+import type { LobbyTable, ServerMessage } from '@evo/alchemy-brawl/engine';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { handleApi } from './api.ts';
 import { catalogEntry, type Catalog } from './catalog.ts';

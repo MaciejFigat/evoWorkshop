@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import type { LobbyTable } from '@evo/brawl-shared';
+import type { LobbyTable } from '@evo/alchemy-brawl/engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { createApp, type Connection, type LobbyLike } from './app.ts';
@@ -107,7 +107,7 @@ describe('createApp', () => {
       entryUrl: '/games/alchemy-brawl/',
       coverUrl: '/games/alchemy-brawl/cover.svg',
       core: null,
-      rel: 'apps/alchemy-brawl/client',
+      rel: 'games/alchemy-brawl',
     });
   });
 
@@ -226,7 +226,7 @@ describe('renderShell', () => {
     core: null,
     entryUrl: '/games/x/',
     coverUrl: '/games/x/cover.svg',
-    rel: 'apps/web/games/x',
+    rel: 'games/x',
   };
 
   it('injects before the first script in the body', () => {
