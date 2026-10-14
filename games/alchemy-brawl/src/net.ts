@@ -7,6 +7,12 @@ import {
   type ServerMessage,
   type TableView,
 } from '@evo/alchemy-brawl/engine';
+import { historyLine, nameResolver } from './text';
+
+export type ChatLine = { from: string; playerId: string; text: string };
+
+const CHAT_LINES = 50;
+const HISTORY_LINES = 20;
 
 export type NetState = {
   status: 'connecting' | 'open' | 'closed';
@@ -15,6 +21,9 @@ export type NetState = {
   lobby: LobbyTable[];
   table: TableView | null;
   events: HandEvent[];
+  // Table chat and the settled rounds of this table, newest last; both start over at another table.
+  chat: ChatLine[];
+  history: string[];
   seq: number;
   receivedAt: number;
   error: ServerError | null;
@@ -71,6 +80,8 @@ export function createConnection(emit: Emit): Net {
     lobby: [],
     table: null,
     events: [],
+    chat: [],
+    history: [],
     seq: 0,
     receivedAt: 0,
     error: null,
@@ -99,14 +110,23 @@ export function createConnection(emit: Emit): Net {
         update({ playerId: message.playerId });
         return;
       case 'lobby':
-        update({ lobby: message.tables, table: null, events: [] });
+        update({ lobby: message.tables, table: null, events: [], chat: [], history: [] });
         return;
       case 'table':
-        update({ table: message.view, events: message.events, seq: state.seq + 1, receivedAt: Date.now() });
+        update({
+          table: message.view,
+          events: message.events,
+          history: [...state.history, ...historyOf(message.view, message.events)].slice(-HISTORY_LINES),
+          seq: state.seq + 1,
+          receivedAt: Date.now(),
+        });
         reportRounds(message.view, message.events, emit);
         return;
       case 'left':
-        update({ table: null, events: [] });
+        update({ table: null, events: [], chat: [], history: [] });
+        return;
+      case 'chat':
+        update({ chat: [...state.chat, { from: message.from, playerId: message.playerId, text: message.text }].slice(-CHAT_LINES) });
         return;
       case 'error':
         update({ error: message.reason });
@@ -155,6 +175,18 @@ export function createConnection(emit: Emit): Net {
   };
 }
 
+function historyOf(view: TableView, events: HandEvent[]): string[] {
+  const hand = view.hand;
+  if (hand === null) {
+    return [];
+  }
+  const nameOf = nameResolver(view, hand);
+  return events.flatMap((event) => {
+    const line = historyLine(view.handNo, event, nameOf);
+    return line === null ? [] : [line];
+  });
+}
+
 // The bench scorecard reads `round` events: one per finished hand, from this player's seat.
 function reportRounds(view: TableView, events: HandEvent[], emit: Emit): void {
   const hand = view.hand;
@@ -169,7 +201,7 @@ function reportRounds(view: TableView, events: HandEvent[], emit: Emit): void {
     }
     const result = event.result;
     const round1 = hand.round1;
-    const combination = result.combinations.find((entry) => entry.seat === seat)?.combination;
+    const combination = result.combinations.find((entry) => entry.seat === seat)?.combination ?? hand.you?.best ?? null;
     emit('round', {
       round: view.handNo,
       seed: view.handSeed,
@@ -181,7 +213,7 @@ function reportRounds(view: TableView, events: HandEvent[], emit: Emit): void {
       round1Winners: round1?.winners ?? [],
       finalWinners: result.winners,
       yourRound1: player.stayed === true ? 'stayed' : 'skipped',
-      yourFinal: player.folded ? 'folded' : (combination?.category ?? 'unrevealed'),
+      yourFinal: player.folded ? 'folded' : (combination?.category ?? 'folded'),
     });
   }
 }

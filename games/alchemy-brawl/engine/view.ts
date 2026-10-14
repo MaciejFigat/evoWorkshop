@@ -1,5 +1,5 @@
 import { legalBets } from './hand.ts';
-import { bestCombination } from './scoring.ts';
+import { bestCombination, bestOfCards } from './scoring.ts';
 import type { CardOption, HandState, HandView, PlayerView, YouView } from './types.ts';
 
 export function viewFor(state: HandState, seat: number | null): HandView {
@@ -7,12 +7,10 @@ export function viewFor(state: HandState, seat: number | null): HandView {
   const players: PlayerView[] = state.players.map((player) => ({
     id: player.id,
     stack: player.stack,
-    // A stay spends the cast at once; while the window is open the count must not show it.
-    handCount: windowOpen && player.decision?.kind === 'stay' ? player.hand.length + 1 : player.hand.length,
+    handCount: player.hand.length,
     decided: player.decision !== null,
     stayed: windowOpen ? null : player.decision?.kind === 'stay',
     shown: windowOpen ? null : player.shown,
-    castLocked: player.pendingCast !== null,
     folded: player.folded,
     committed: player.committed,
     roundCommitted: player.roundCommitted,
@@ -46,17 +44,17 @@ function youFor(state: HandState, seat: number): YouView | null {
   if (player === undefined) {
     return null;
   }
-  const own = player.pendingCast === null ? player.hand : [...player.hand, player.pendingCast];
+  const inFinal = state.phase === 'bet' || state.phase === 'reveal' || state.phase === 'done';
   const options: CardOption[] =
-    state.table.length < 2 ? [] : own.map((card) => ({ card, combination: bestCombination(card, state.table) }));
+    state.phase === 'decide' ? player.hand.map((card) => ({ card, combination: bestCombination(card, state.table) })) : [];
   return {
     seat,
     hand: [...player.hand],
     decision: player.decision,
-    pendingCast: player.pendingCast,
     canDecide: state.phase === 'decide' && player.decision === null,
-    canCast: state.phase === 'cast' && !player.folded && player.pendingCast === null,
     legalBets: legalBets(state, seat),
     options,
+    // A folded player still sees their own best: it is their own cards plus public ones.
+    best: inFinal ? bestOfCards([...player.hand, ...state.table]) : null,
   };
 }

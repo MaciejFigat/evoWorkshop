@@ -10,7 +10,6 @@ export type TableConfig = {
   maxPlayers: number;
   buyIn: number;
   decideTimerMs: number;
-  castTimerMs: number;
   actionTimerMs: number;
   rules: Rules;
 };
@@ -31,7 +30,6 @@ export const DEFAULT_TABLE: TableConfig = {
   maxPlayers: DEFAULT_SEATS,
   buyIn: 1000,
   decideTimerMs: 20_000,
-  castTimerMs: 12_000,
   actionTimerMs: 10_000,
   rules: DEFAULT_RULES,
 };

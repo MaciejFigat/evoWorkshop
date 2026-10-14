@@ -7,13 +7,15 @@ export type BetKind = 'check' | 'bet' | 'call' | 'raise' | 'fold';
 export const CATEGORIES = ['high', 'pair', 'flush', 'straight', 'three', 'straightFlush'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-// `cards` are the three cards used, the cast first. `key` compares two combinations
+// `cards` are the three cards used, the player's own card first in Round 1. `key` compares two combinations
 // lexicographically: category rank first, then the tiebreak powers from spec §5.
 export type Combination = { category: Category; cards: Card[]; key: number[] };
 
-export type Phase = 'decide' | 'round1End' | 'cast' | 'bet' | 'reveal' | 'done';
+export type Phase = 'decide' | 'round1End' | 'bet' | 'reveal' | 'done';
 
-export type Decision = { kind: 'stay'; cast: Card; show: Card } | { kind: 'skip' };
+// Round 1: to stay you turn one card face up. That card plays for the Round 1 pot with the two table
+// cards and stays in your hand, face up, until the hand ends. Nothing is ever discarded.
+export type Decision = { kind: 'stay'; show: Card } | { kind: 'skip' };
 
 export type HandPlayer = {
   id: string;
@@ -23,8 +25,6 @@ export type HandPlayer = {
   decision: Decision | null;
   // The card a Round 1 stayer turned face up; it stays in the hand and is public until the hand ends.
   shown: Card | null;
-  // Final cast, hidden until the reveal.
-  pendingCast: Card | null;
   folded: boolean;
   committed: number;
   roundCommitted: number;
@@ -33,15 +33,16 @@ export type HandPlayer = {
 export type Betting = { level: number; bets: number; toAct: number[] };
 
 export type SeatCard = { seat: number; card: Card };
+export type SeatCards = { seat: number; cards: Card[] };
 export type SeatCombination = { seat: number; combination: Combination };
 
 export type Round1Result = {
   table: Card[];
   pot: number;
   stayers: number[];
+  // The shown card of every stayer, public once the window closes.
   shown: SeatCard[];
-  // Empty when at most one player stayed: a lone stayer's cast is discarded unrevealed.
-  casts: SeatCard[];
+  // Empty when at most one player stayed: a lone stayer takes the pot without a contest.
   combinations: SeatCombination[];
   // Empty when nobody stayed and the pot rolled into the Final.
   winners: number[];
@@ -49,11 +50,14 @@ export type Round1Result = {
   rolledOver: boolean;
 };
 
+// The Final plays every card: each remaining hand is shown at the showdown and its combination is
+// the best three cards among the hand and the table, as the board plays in poker.
 export type FinalResult = {
   reason: 'fold' | 'showdown';
   table: Card[];
   pot: number;
-  casts: SeatCard[];
+  // Empty on a fold: nothing is revealed.
+  hands: SeatCards[];
   combinations: SeatCombination[];
   winners: number[];
   payouts: number[];
@@ -67,7 +71,8 @@ export type HandState = {
   phase: Phase;
   round1Pot: number;
   finalPot: number;
-  // Shared face-up cards: 2 in Round 1, 3 in the Final, fresh each round.
+  // Shared face-up cards: 2 in Round 1, 3 in the Final, fresh each round. The Final has no cast:
+  // after the draw the three table cards go up and betting starts at once.
   table: Card[];
   betting: Betting | null;
   round1: Round1Result | null;
@@ -76,7 +81,6 @@ export type HandState = {
 
 export type HandAction =
   | { type: 'decide'; seat: number; decision: Decision }
-  | { type: 'cast'; seat: number; card: Card }
   | { type: 'bet'; seat: number; kind: BetKind }
   | { type: 'timeout' }
   | { type: 'advance' };
@@ -86,7 +90,6 @@ export type HandEvent =
   | { type: 'decisionLocked'; seat: number }
   | { type: 'round1Resolved'; result: Round1Result }
   | { type: 'finalStarted'; table: Card[] }
-  | { type: 'castLocked'; seat: number }
   | { type: 'betPlaced'; seat: number; kind: BetKind; amount: number }
   | { type: 'handEnded'; result: FinalResult };
 
@@ -97,9 +100,7 @@ export type StepError =
   | 'unknown_seat'
   | 'folded'
   | 'already_decided'
-  | 'already_cast'
   | 'card_not_in_hand'
-  | 'same_card'
   | 'not_your_turn'
   | 'illegal_bet'
   | 'insufficient_stack';
@@ -117,7 +118,6 @@ export type PlayerView = {
   // Known once the Round 1 window closes; null before that.
   stayed: boolean | null;
   shown: Card | null;
-  castLocked: boolean;
   folded: boolean;
   committed: number;
   roundCommitted: number;
@@ -125,19 +125,19 @@ export type PlayerView = {
 
 export type BettingView = { level: number; bets: number; cap: number; unit: number; actor: number | null };
 
-// What each card in your hand would make with the current table: your own cards plus public
-// cards, nothing hidden. Empty when there is no table yet.
+// Round 1: what each card in your hand would make, shown, with the two table cards. Your own
+// cards plus public cards, nothing hidden. Empty outside Round 1.
 export type CardOption = { card: Card; combination: Combination };
 
 export type YouView = {
   seat: number;
   hand: Card[];
   decision: Decision | null;
-  pendingCast: Card | null;
   canDecide: boolean;
-  canCast: boolean;
   legalBets: BetKind[];
   options: CardOption[];
+  // Final: the best three cards among your hand and the table; null before the Final.
+  best: Combination | null;
 };
 
 export type HandView = {

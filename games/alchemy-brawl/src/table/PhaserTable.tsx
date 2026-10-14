@@ -11,14 +11,16 @@ export function PhaserTable({ net }: { net: Net }) {
     if (!host.current) {
       return;
     }
+    // The canvas holds device pixels; CSS scales it down to fit the board, so a Retina screen gets a crisp table.
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: host.current,
-      width: WIDTH,
-      height: HEIGHT,
+      width: WIDTH * dpr,
+      height: HEIGHT * dpr,
       backgroundColor: '#14110f',
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-      scene: [new TableScene(net)],
+      scene: [new TableScene(net, dpr)],
     });
     return () => game.destroy(true);
   }, [net]);

@@ -134,11 +134,98 @@ describe('Lobby', () => {
     for (const event of ended) {
       expect(event.result.payouts).toHaveLength(3);
       expect(event.result.payouts.reduce((sum, p) => sum + p, 0)).toBe(event.result.pot);
+      expect(event.result.hands).toHaveLength(event.result.reason === 'fold' ? 0 : event.result.combinations.length);
+    }
+    expect(ended.some((e) => e.result.reason === 'showdown')).toBe(true);
+    // Hands come out only in the showdown and only for the seats that did not fold.
+    const views = a.inbox.flatMap((m) => (m.type === 'table' && m.events.some((e) => e.type === 'handEnded') ? [m.view] : []));
+    for (const view of views) {
+      const final = view.hand?.final;
+      if (final?.reason !== 'showdown') {
+        continue;
+      }
+      const unfolded = (view.hand?.players ?? []).flatMap((p, seat) => (p.folded ? [] : [seat]));
+      expect(final.hands.map((h) => h.seat)).toEqual(unfolded);
+      for (const revealed of final.hands) {
+        expect(revealed.cards.length).toBeGreaterThanOrEqual(3);
+      }
     }
     expect(a.inbox.some((m) => m.type === 'error')).toBe(false);
+    expect(a.inbox.some((m) => m.type === 'chat')).toBe(false);
   });
 
-  it('closes the Round 1 window on decideTimerMs and the Final cast on castTimerMs', () => {
+  it('shows every stayer one card face up after the Round 1 window and deals everyone to four', () => {
+    const lobby = new Lobby(DEFAULT_TABLE);
+    const a = soloTable(lobby);
+    vi.advanceTimersByTime(START_DELAY_MS + 100);
+    expect(lastTable(a).hand?.phase).toBe('decide');
+    const mine = lastTable(a).hand?.you?.hand ?? [];
+    const show = mine[0];
+    if (show === undefined) {
+      throw new Error('no hand dealt');
+    }
+    a.say({ type: 'decide', decision: { kind: 'stay', show } });
+    expect(a.inbox.some((m) => m.type === 'error')).toBe(false);
+    // The window closes as soon as every seat has locked in, so read the view that came with each event.
+    vi.advanceTimersByTime(DEFAULT_TABLE.decideTimerMs + ROUND1_END_DELAY_MS);
+    const viewWith = (type: HandEvent['type']) =>
+      a.inbox.flatMap((m) => (m.type === 'table' && m.events.some((e) => e.type === type) ? [m.view.hand] : []))[0] ?? null;
+    const closed = viewWith('round1Resolved');
+    expect(closed?.phase).toBe('round1End');
+    const you = closed?.you?.seat ?? -1;
+    expect(closed?.players[you]?.shown).toEqual(show);
+    expect(closed?.players[you]?.handCount).toBe(3);
+    expect(closed?.you?.hand).toHaveLength(3);
+    for (const player of closed?.players ?? []) {
+      expect(player.shown === null).toBe(player.stayed === false);
+    }
+    expect(closed?.round1?.shown.map((s) => s.seat)).toEqual(closed?.round1?.stayers);
+    const final = viewWith('finalStarted');
+    expect(final?.phase).toBe('bet');
+    expect(final?.you?.hand).toHaveLength(4);
+    expect(final?.players.map((p) => p.handCount)).toEqual([4, 4, 4]);
+    expect(final?.players[you]?.shown).toEqual(show);
+  });
+
+  it('relays a chat line to every human at the table under the sender name', () => {
+    const lobby = new Lobby(DEFAULT_TABLE);
+    const a = client(lobby);
+    const b = client(lobby);
+    const c = client(lobby);
+    a.say(hello('token-aaaa', 'Ada'));
+    a.say({ type: 'create', maxPlayers: 4 });
+    const code = lastTable(a).code;
+    b.say(hello('token-bbbb', 'Ben'));
+    b.say({ type: 'join', code });
+    c.say(hello('token-cccc', 'Cid'));
+    a.say({ type: 'addBot' });
+    const ada = lastTable(a).you;
+    b.say({ type: 'chat', text: '  good luck  ' });
+    const line = { type: 'chat', from: 'Ben', playerId: lastTable(b).you, text: 'good luck' };
+    expect(a.inbox.at(-1)).toEqual(line);
+    expect(b.inbox.at(-1)).toEqual(line);
+    expect(c.inbox.some((m) => m.type === 'chat')).toBe(false);
+    a.say({ type: 'chat', text: 'thanks' });
+    expect(b.inbox.at(-1)).toEqual({ type: 'chat', from: 'Ada', playerId: ada, text: 'thanks' });
+    expect(a.inbox.at(-1)).toEqual({ type: 'chat', from: 'Ada', playerId: ada, text: 'thanks' });
+  });
+
+  it('answers an error to a chat before hello, without a table or with an empty line', () => {
+    const lobby = new Lobby(DEFAULT_TABLE);
+    const a = client(lobby);
+    a.say({ type: 'chat', text: 'hi' });
+    expect(a.inbox.at(-1)).toEqual({ type: 'error', reason: 'not_identified' });
+    a.say(hello('token-aaaa', 'Ada'));
+    a.say({ type: 'chat', text: 'hi' });
+    expect(a.inbox.at(-1)).toEqual({ type: 'error', reason: 'not_seated' });
+    a.say({ type: 'create', maxPlayers: 3 });
+    a.say({ type: 'chat', text: '   ' });
+    expect(a.inbox.at(-1)).toEqual({ type: 'error', reason: 'invalid_message' });
+    a.say({ type: 'chat', text: 'x'.repeat(201) });
+    expect(a.inbox.at(-1)).toEqual({ type: 'error', reason: 'invalid_message' });
+  });
+
+  it('closes the Round 1 window on decideTimerMs and opens Final betting straight after round1End', () => {
     const lobby = new Lobby(DEFAULT_TABLE);
     const a = soloTable(lobby);
     vi.advanceTimersByTime(START_DELAY_MS);
@@ -149,11 +236,11 @@ describe('Lobby', () => {
     expect(lastTable(a).hand?.phase).toBe('round1End');
 
     vi.advanceTimersByTime(ROUND1_END_DELAY_MS);
-    expect(lastTable(a).hand?.phase).toBe('cast');
-    vi.advanceTimersByTime(DEFAULT_TABLE.castTimerMs - 1);
-    expect(lastTable(a).hand?.phase).toBe('cast');
-    vi.advanceTimersByTime(1);
-    expect(lastTable(a).hand?.phase).toBe('bet');
+    const view = lastTable(a);
+    expect(view.hand?.phase).toBe('bet');
+    expect(view.hand?.table).toHaveLength(3);
+    expect(view.hand?.you?.best).not.toBeNull();
+    expect(events(a).some((e) => e.type === 'finalStarted' && e.table.length === 3)).toBe(true);
   });
 
   it('answers wrong_phase to a bet sent during the Round 1 window', () => {

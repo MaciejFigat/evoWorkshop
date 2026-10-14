@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORY_RANK, bestCombination, compareCombinations, rankThree, winnersOf } from './scoring.ts';
+import { CATEGORY_RANK, bestCombination, bestOfCards, compareCombinations, rankThree, winnersOf } from './scoring.ts';
 import { card, cards } from './testDeck.ts';
 import { CATEGORIES } from './types.ts';
 
@@ -16,7 +16,7 @@ describe('rankThree', () => {
     CATEGORIES.forEach((category, i) => expect(CATEGORY_RANK[category]).toBe(i));
   });
 
-  it('names every category with its key, cast first', () => {
+  it('names every category with its key, own card first', () => {
     expect(rank('5F 6F 7F')).toMatchObject({ category: 'straightFlush', key: [5, 7] });
     expect(rank('9W 9F 9A')).toMatchObject({ category: 'three', key: [4, 9] });
     expect(rank('9A 10A 11E')).toMatchObject({ category: 'straight', key: [3, 11] });
@@ -46,8 +46,14 @@ describe('rankThree', () => {
 });
 
 describe('bestCombination', () => {
-  it('uses both cards of a two-card table', () => {
-    expect(bestCombination(card('9A'), cards('10A 11E'))).toMatchObject({ category: 'straight', key: [3, 11] });
+  it('uses both cards of a two-card table, shown card first', () => {
+    expect(bestCombination(card('9A'), cards('10A 11E'))).toEqual({
+      category: 'straight',
+      cards: cards('9A 10A 11E'),
+      key: [3, 11],
+    });
+    expect(bestCombination(card('12W'), cards('10A 11E'))).toMatchObject({ category: 'straight', key: [3, 12] });
+    expect(bestCombination(card('3E'), cards('10A 11E'))).toMatchObject({ category: 'high', key: [0, 11, 10, 3] });
   });
 
   it('picks the best pair of three table cards', () => {
@@ -56,6 +62,32 @@ describe('bestCombination', () => {
     expect(best.cards).toEqual(cards('10F 3F 6F'));
     expect(bestCombination(card('6W'), cards('3F 6F 9E'))).toMatchObject({ category: 'pair', key: [1, 6, 9] });
     expect(bestCombination(card('8W'), cards('7F 9F 8E'))).toMatchObject({ category: 'straight', key: [3, 9] });
+  });
+});
+
+describe('bestOfCards', () => {
+  it('takes the best three of any count, highest power first', () => {
+    const boris = bestOfCards(cards('10F 12W 5F 3F 6F 9E'));
+    expect(boris).toMatchObject({ category: 'flush', key: [2, 10, 6, 5] });
+    expect(boris?.cards).toEqual(cards('10F 6F 5F'));
+    expect(bestOfCards(cards('7F 12E 13A 1W 3F 6F 9E'))).toMatchObject({ category: 'flush', key: [2, 7, 6, 3] });
+    expect(bestOfCards(cards('6W 13E 7W 3F 6F 9E'))).toMatchObject({ category: 'pair', key: [1, 6, 13] });
+    expect(bestOfCards(cards('2F 11A 5W 8W 3F 6F 9E'))).toMatchObject({ category: 'flush', key: [2, 6, 3, 2] });
+  });
+
+  it('lets the board play and prefers a straight to a flush', () => {
+    expect(bestOfCards(cards('1W 2A 9E 2E 5F 6F 7F'))).toEqual({
+      category: 'straightFlush',
+      cards: cards('7F 6F 5F'),
+      key: [5, 7],
+    });
+    expect(bestOfCards(cards('1F 3F 12F 2W 13W 8E'))).toMatchObject({ category: 'straight', key: [3, 3] });
+  });
+
+  it('is null with fewer than three cards', () => {
+    expect(bestOfCards([])).toBeNull();
+    expect(bestOfCards(cards('5F 6F'))).toBeNull();
+    expect(bestOfCards(cards('5F 6F 7W'))).toMatchObject({ category: 'straight', cards: cards('7W 6F 5F') });
   });
 });
 

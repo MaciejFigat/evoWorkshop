@@ -7,6 +7,7 @@
   --muted: #9a8f7e;
   --gold: #c9a227;
   --burn: #d0342c;
+  --green: #6a994e;
   color-scheme: dark;
 }
 
@@ -22,37 +23,51 @@ body,
 
 body {
   margin: 0;
+  overflow: hidden;
   background: var(--bg);
   color: var(--ink);
-  font: 15px/1.4 Georgia, serif;
+  font: 14px/1.4 Georgia, serif;
 }
 
-/* The page runs inside the playground's iframe: everything fits the viewport, the board takes the rest. */
-main {
-  display: flex;
-  flex-direction: column;
+/* The page runs inside the playground's iframe: a poker-room shell fills the viewport. Side panels
+   left and right, the centre column holds a slim top row, the board and the fixed control bar, so the
+   board takes everything the fixed rows leave and never resizes between phases. */
+.shell {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 250px;
+  gap: 10px;
   height: 100%;
-  min-height: 0;
-  padding: 8px 14px 10px;
+  padding: 10px;
 }
 
-.table-screen {
+.side {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.centre {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.centre-body {
   flex: 1;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
 }
 
-h1,
-h2 {
+h2,
+h3 {
   margin: 0;
   font-weight: normal;
-}
-
-h1 {
-  font-size: 22px;
-  color: var(--gold);
-  letter-spacing: 1px;
 }
 
 h2 {
@@ -61,33 +76,45 @@ h2 {
   color: var(--gold);
 }
 
-.top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 8px;
+h3 {
+  flex: none;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
 
 .muted {
   color: var(--muted);
-  margin: 0 0 6px;
+  margin: 0;
 }
 
+/* Floats over the page so a server error never shifts the board. */
 .error {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin: 0;
   border: 1px solid var(--burn);
+  border-radius: 8px;
   color: var(--burn);
+  background: var(--panel);
   padding: 6px 10px;
 }
 
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  box-shadow: inset 0 0 0 1px #000, 0 0 0 1px #2a241f;
-  padding: 14px;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 #3a3027;
+  padding: 12px 14px;
+  min-height: 0;
 }
 
+/* Every button centres its text both ways; the pills below only change the size. */
 button,
 input,
 select {
@@ -95,12 +122,18 @@ select {
   color: var(--ink);
   background: var(--parchment);
   border: 1px solid var(--line);
-  padding: 6px 12px;
+  border-radius: 8px;
 }
 
 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  height: 30px;
+  padding: 0 12px;
+  white-space: nowrap;
   cursor: pointer;
-  text-transform: capitalize;
   border-color: #6b5a3e;
 }
 
@@ -114,13 +147,92 @@ button:disabled {
   cursor: default;
 }
 
+input,
+select {
+  height: 30px;
+  padding: 0 10px;
+}
+
 code {
   color: var(--gold);
   letter-spacing: 2px;
 }
 
+/* ---- top row: one line, nothing wraps ---- */
+.topbar {
+  flex: none;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  white-space: nowrap;
+}
+
+.topbar-title {
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+.topbar-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar .spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--parchment);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chip b {
+  font-weight: normal;
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot.open {
+  background: var(--green);
+}
+
+.dot.connecting {
+  background: var(--gold);
+}
+
+.dot.closed {
+  background: var(--burn);
+}
+
+/* ---- name screen and lobby ---- */
 .name-form {
-  max-width: 360px;
+  width: min(420px, 100%);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -130,7 +242,30 @@ code {
   width: 100%;
 }
 
+.name-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.rules p {
+  margin: 0 0 8px;
+}
+
+.rules ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rules li {
+  margin-bottom: 6px;
+}
+
+.rules li::marker {
+  color: var(--gold);
+}
+
 .lobby {
+  width: min(640px, 100%);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
@@ -166,20 +301,99 @@ code {
   border-top: 1px solid var(--line);
 }
 
-.table-bar {
+/* ---- the board ---- */
+/* Round banner and fuse: above the board, never over the table art. */
+.strip {
+  flex: none;
+  height: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.banner {
+  width: 240px;
+  height: 52px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  justify-content: center;
+  padding-bottom: 4px;
+  background: center / 100% 100% no-repeat;
+  color: var(--ink);
+  font-size: 19px;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 2px #000;
 }
 
-.table-bar .spacer {
-  flex: 1;
+.fuse {
+  position: relative;
+  width: 320px;
+  height: 8px;
+  border-radius: 6px;
+  background: var(--parchment);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.clock {
+.fuse-lit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 6px;
+  transition: width 100ms linear;
+}
+
+.fuse-spark {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  animation: flicker 140ms infinite alternate ease-in-out;
+}
+
+.fuse-spark span {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
   color: var(--gold);
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes flicker {
+  from {
+    transform: translateY(-50%) scale(0.85);
+  }
+  to {
+    transform: translateY(-50%) scale(1.2);
+  }
+}
+
+/* The board and the control bar sit together, centred in the column: the board keeps the table's
+   16:9 and the bar hangs right under it, so there is no hole between them on tall screens. */
+.play {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: calc(100% - 196px);
+  min-height: 0;
 }
 
 .board {
@@ -187,7 +401,7 @@ code {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border-radius: 12px;
   background: var(--bg);
 }
 
@@ -199,45 +413,240 @@ code {
   display: block;
 }
 
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(20, 17, 15, 0.7);
+}
+
+.overlay .panel {
+  max-width: 520px;
+  max-height: 100%;
+  overflow: auto;
+  background: var(--parchment);
+}
+
+.overlay button {
+  margin-top: 10px;
+}
+
+/* ---- the control bar: a fixed-height strip under the board. Tiles on the left, the action cluster
+   centred over the table as long as the tiles leave room (the empty third column balances them),
+   the hint under the buttons. ---- */
 .hud {
   flex: none;
-  max-height: 34%;
-  overflow: auto;
-  padding: 10px 14px;
+  height: 96px;
   margin-top: 8px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.prompt {
-  margin: 0 0 8px;
+.hud-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 260px;
+  max-width: 640px;
 }
 
-.choice {
-  margin: 0 0 8px;
+/* Without buttons the status takes their room: a Round 1 or showdown result reads in full. */
+.hud-actions.no-actions .hud-status {
+  height: 56px;
+  line-height: 18px;
+  white-space: normal;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.hud-actions.no-actions .hud-buttons {
+  display: none;
+}
+
+.hud-status {
+  max-width: 100%;
+  height: 18px;
+  line-height: 18px;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 40px;
+}
+
+.hud-hint {
+  margin: 0;
+  max-width: 100%;
+  height: 14px;
+  line-height: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pill buttons: the action cluster. The label and its amount share a baseline inside the centred span. */
+.pill {
+  height: 40px;
+  min-width: 104px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid #7a6540;
+  background: linear-gradient(180deg, #3a3028 0%, #26201a 100%);
+  color: var(--ink);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 0 #0d0a08, inset 0 1px 0 #4d4034;
+}
+
+.pill > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.pill small {
+  font-size: 12px;
+  color: var(--gold);
+  letter-spacing: 0;
+}
+
+.pill.primary {
+  background: linear-gradient(180deg, #e2bb45 0%, #b88d1f 100%);
+  border-color: #e9c75c;
+  color: #1c150c;
+  box-shadow: 0 2px 0 #5c4510, inset 0 1px 0 #f3dc8a;
+}
+
+.pill.primary small {
+  color: #3a2a08;
+}
+
+.pill.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f0ca55 0%, #c69a2a 100%);
+  color: #1c150c;
+}
+
+.pill.quiet {
+  background: transparent;
+  border-color: var(--line);
+}
+
+.pill:disabled {
+  opacity: 0.35;
+}
+
+/* ---- side panels ---- */
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-lines {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.chat-line b {
+  display: block;
+  font-weight: normal;
+  font-size: 11px;
   color: var(--gold);
 }
 
-.bets {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 6px;
+.chat-line.mine b {
+  color: var(--muted);
 }
 
-.options {
+.chat form {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chat input {
+  flex: 1;
+  min-width: 0;
+}
+
+.hands {
+  flex: none;
+}
+
+.combos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.combos th {
+  text-align: left;
+  font-weight: normal;
+  vertical-align: top;
+  white-space: nowrap;
+  color: var(--ink);
+  padding: 3px 8px 3px 6px;
+}
+
+.combos td {
+  color: var(--muted);
+  padding: 3px 6px 3px 0;
+}
+
+.combos tr.active th,
+.combos tr.active td {
+  color: var(--gold);
+  background: var(--parchment);
+}
+
+.history {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.history ul {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
-.options li {
-  display: flex;
-  gap: 8px;
+.history li {
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
 }
 
-.options .muted {
-  margin: 0;
+.history li:first-child {
+  color: var(--ink);
+  border-top: none;
 }

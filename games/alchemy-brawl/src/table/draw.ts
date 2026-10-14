@@ -1,6 +1,6 @@
 import type { Card } from '@evo/alchemy-brawl/engine';
 import type * as Phaser from 'phaser';
-import { CARD_BACK, CARD_SLOT, cardKey } from '../assets';
+import { CARD_SLOT, cardKey } from '../assets';
 
 export const WIDTH = 1280;
 export const HEIGHT = 720;
@@ -12,20 +12,19 @@ export const GOLD_CSS = '#c9a227';
 export const GOLD = 0xc9a227;
 export const PANEL = 0x1d1a17;
 export const LINE = 0x4a4038;
-export const PALE = 0xe8dcc4;
 
-export type CardFace = { kind: 'face'; card: Card } | { kind: 'back' } | { kind: 'slot' };
+export type CardFace = { kind: 'face'; card: Card } | { kind: 'slot' };
 
+// The camera zoom is the device pixel ratio; text rasterises at that resolution so it stays sharp.
 export function text(scene: Phaser.Scene, x: number, y: number, value: string, size: number, color = INK) {
-  return scene.add.text(x, y, value, { fontFamily: FONT, fontSize: `${size}px`, color });
+  const resolution = scene.cameras.main.zoom;
+  return scene.add.text(x, y, value, { fontFamily: FONT, fontSize: `${size}px`, color, resolution });
 }
 
 function textureFor(face: CardFace): string {
   switch (face.kind) {
     case 'face':
       return cardKey(face.card);
-    case 'back':
-      return CARD_BACK;
     case 'slot':
       return CARD_SLOT;
   }

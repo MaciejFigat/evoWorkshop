@@ -7,7 +7,6 @@ import {
   step,
   viewFor,
   type BetKind,
-  type Card,
   type Decision,
   type HandAction,
   type HandEvent,
@@ -33,7 +32,6 @@ const SEED_RANGE = 2 ** 31;
 
 export type PlayerMove =
   | { type: 'decide'; decision: Decision }
-  | { type: 'cast'; card: Card }
   | { type: 'bet'; kind: BetKind };
 
 export type TableHooks = {
@@ -150,6 +148,20 @@ export class Table {
     return null;
   }
 
+  // Table chat: one line from a seated player to every connected human seat, the sender included.
+  chat(id: string, text: string): ServerError | null {
+    const sender = this.seats.find((s) => s.id === id && !s.leaving);
+    if (sender === undefined) {
+      return 'not_seated';
+    }
+    for (const seat of this.seats) {
+      if (seat.bot === null && seat.connected && !seat.leaving) {
+        this.hooks.deliver(seat.id, { type: 'chat', from: sender.name, playerId: id, text });
+      }
+    }
+    return null;
+  }
+
   close(): void {
     this.clearTimers();
     this.seats = [];
@@ -207,8 +219,8 @@ export class Table {
     }
   }
 
-  // The simultaneous windows (decide, cast) keep their clock while seats lock in; the betting
-  // clock restarts for every new actor.
+  // The Round 1 window keeps its clock while seats lock in; the betting clock restarts for every
+  // new actor.
   private schedule(phaseChanged: boolean): void {
     this.botTimers.forEach(clearTimeout);
     this.botTimers = [];
@@ -221,9 +233,6 @@ export class Table {
       switch (hand.phase) {
         case 'decide':
           this.startClock(this.config.decideTimerMs);
-          break;
-        case 'cast':
-          this.startClock(this.config.castTimerMs);
           break;
         case 'bet':
           this.startClock(this.config.actionTimerMs);
@@ -251,11 +260,9 @@ export class Table {
     const waiting =
       hand.phase === 'decide'
         ? hand.players.filter((p) => p.decision === null).map((p) => p.id)
-        : hand.phase === 'cast'
-          ? hand.players.filter((p) => !p.folded && p.pendingCast === null).map((p) => p.id)
-          : hand.phase === 'bet' && hand.betting !== null
-            ? hand.betting.toAct.slice(0, 1).flatMap((seat) => hand.players[seat]?.id ?? [])
-            : [];
+        : hand.phase === 'bet' && hand.betting !== null
+          ? hand.betting.toAct.slice(0, 1).flatMap((seat) => hand.players[seat]?.id ?? [])
+          : [];
     for (const id of waiting) {
       const rng = this.seats.find((s) => s.id === id)?.bot;
       if (rng !== undefined && rng !== null) {
