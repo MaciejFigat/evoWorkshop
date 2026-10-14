@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { CatalogEntry } from './catalog.ts';
 
-export const PAGE_ROUTES = ['/', '/library', '/game/:id', '/game/:id/:tab', '/stats', '/stats/board', '/add', '/my'] as const;
+export const PAGE_ROUTES = ['/', '/library', '/game/:id', '/game/:id/:tab', '/stats', '/stats/board', '/add', '/my', '/ideas'] as const;
 
 function matches(pattern: string, pathname: string): boolean {
   const want = pattern.split('/');

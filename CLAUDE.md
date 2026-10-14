@@ -106,8 +106,9 @@ All on one origin, http://localhost:5180:
 
 - Pages, a server-rendered `shell.html` with mock data and `window.EVO_CATALOG` (the list of
   `catalogEntry`) injected as a script before the page's own scripts: `/`, `/library`,
-  `/game/:id`, `/game/:id/:tab`, `/stats`, `/stats/board`, `/add`, `/my`.
-- JSON: `/api/games`, `/api/games/:id`, `/api/tables`.
+  `/game/:id`, `/game/:id/:tab`, `/stats`, `/stats/board`, `/add`, `/my`, `/ideas`.
+- JSON: `/api/games`, `/api/games/:id`, `/api/tables`; `POST /api/ideas` forwards an idea to the
+  Slack workflow webhook in `IDEAS_WEBHOOK_URL` (root `.env`, see `.env.example`; unset = 503).
 - Game pages: `/games/<id>/` (dev: Vite transforms them; prod: from `apps/web/dist`).
 - WebSocket: `/ws` for Alchemy Brawl's `Lobby`; `/games/project-phlebas-coop/ws` for Project
   Phlebas Co-op's — each game's own path, not a shared one, so a second multiplayer game never

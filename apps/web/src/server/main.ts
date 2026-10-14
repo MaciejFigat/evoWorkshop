@@ -32,6 +32,7 @@ const server = createApp({
   lobby,
   phlebasLobby,
   catalog,
+  ideasWebhookUrl: process.env.IDEAS_WEBHOOK_URL,
 });
 
 if (dev) {

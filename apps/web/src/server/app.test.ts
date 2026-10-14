@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -68,21 +69,55 @@ function wait<T>(what: (done: (value: T) => void, fail: (error: Error) => void) 
   return new Promise(what);
 }
 
+// A stand-in for the Slack workflow webhook: records every body, fails on /fail.
+type Webhook = { server: Server; url: string; bodies: string[] };
+
+async function webhook(): Promise<Webhook> {
+  const bodies: string[] = [];
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      bodies.push(Buffer.concat(chunks).toString('utf8'));
+      res.writeHead(req.url === '/fail' ? 500 : 200).end();
+    });
+  });
+  await wait<void>((done) => server.listen(0, '127.0.0.1', done));
+  const address: AddressInfo | string | null = server.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('no address');
+  }
+  return { server, url: `http://127.0.0.1:${address.port}/hook`, bodies };
+}
+
 describe('createApp', () => {
   let dir = '';
   let base = '';
   let lobby: StubLobby;
   let phlebasLobby: StubPhlebasLobby;
   let server: ReturnType<typeof createApp>;
+  let hook: Webhook;
+  let webhookUrl: string | undefined;
 
   beforeEach(async () => {
+    hook = await webhook();
+    webhookUrl = hook.url;
     dir = mkdtempSync(resolve(tmpdir(), 'evo-app-'));
     const shellFile = resolve(dir, 'shell.html');
     writeFileSync(shellFile, SHELL);
     lobby = stubLobby();
     phlebasLobby = stubPhlebasLobby();
     const catalog = scanGames(repo);
-    server = createApp({ shellFile, cacheShell: true, hmr: false, frontend: stubFrontend, lobby, phlebasLobby, catalog: () => catalog });
+    server = createApp({
+      shellFile,
+      cacheShell: true,
+      hmr: false,
+      frontend: stubFrontend,
+      lobby,
+      phlebasLobby,
+      catalog: () => catalog,
+      ideasWebhookUrl: webhookUrl,
+    });
     await wait<void>((done) => server.listen(0, '127.0.0.1', done));
     const address: AddressInfo | string | null = server.address();
     if (address === null || typeof address === 'string') {
@@ -93,10 +128,11 @@ describe('createApp', () => {
 
   afterEach(async () => {
     await wait<void>((done) => server.close(() => done()));
+    await wait<void>((done) => hook.server.close(() => done()));
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it.each(['/', '/library', '/game/d20', '/game/d20/telemetry', '/stats', '/stats/board', '/add', '/my'])(
+  it.each(['/', '/library', '/game/d20', '/game/d20/telemetry', '/stats', '/stats/board', '/add', '/my', '/ideas'])(
     'serves the shell with the catalog on %s',
     async (path) => {
       const res = await fetch(base + path);
@@ -124,7 +160,7 @@ describe('createApp', () => {
     });
     expect(games.find((game) => game.id === 'alchemy-brawl')).toMatchObject({
       entryUrl: '/games/alchemy-brawl/',
-      coverUrl: '/games/alchemy-brawl/cover.svg',
+      coverUrl: '/games/alchemy-brawl/assets/cover.png',
       core: null,
       rel: 'games/alchemy-brawl',
     });
@@ -152,6 +188,64 @@ describe('createApp', () => {
   it('rejects non-GET on /api with 405', async () => {
     const res = await fetch(`${base}/api/games`, { method: 'POST', body: '{}' });
     expect(res.status).toBe(405);
+  });
+
+  it('forwards a valid idea to the webhook with the Slack variable names', async () => {
+    const idea = { title: ' Plinko with a side bet ', description: 'Drop, then bet on the slot.', imageUrl: '', submittedBy: 'ada' };
+    const res = await fetch(`${base}/api/ideas`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(idea) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(hook.bodies.map((b: string) => JSON.parse(b))).toEqual([
+      { title: 'Plinko with a side bet', description: 'Drop, then bet on the slot.', image_url: '', submitted_by: 'ada' },
+    ]);
+  });
+
+  it('rejects a bad idea body and the wrong method without calling the webhook', async () => {
+    const invalid = await fetch(`${base}/api/ideas`, { method: 'POST', body: '{"title":""}' });
+    expect(invalid.status).toBe(400);
+    const notJson = await fetch(`${base}/api/ideas`, { method: 'POST', body: 'nope' });
+    expect(notJson.status).toBe(400);
+    const get = await fetch(`${base}/api/ideas`);
+    expect(get.status).toBe(405);
+    expect(hook.bodies).toEqual([]);
+  });
+
+  it('answers 502 when the webhook fails and 503 when none is configured', async () => {
+    const idea = JSON.stringify({ title: 't', description: 'd', submittedBy: 'me' });
+    const headers = { 'content-type': 'application/json' };
+    const failing = createApp({
+      shellFile: resolve(dir, 'shell.html'),
+      cacheShell: true,
+      hmr: false,
+      frontend: stubFrontend,
+      lobby,
+      phlebasLobby,
+      catalog: () => scanGames(repo),
+      ideasWebhookUrl: hook.url.replace('/hook', '/fail'),
+    });
+    await wait<void>((done) => failing.listen(0, '127.0.0.1', done));
+    const failingAddress: AddressInfo | string | null = failing.address();
+    const failingPort = failingAddress === null || typeof failingAddress === 'string' ? 0 : failingAddress.port;
+    const failed = await fetch(`http://127.0.0.1:${failingPort}/api/ideas`, { method: 'POST', headers, body: idea });
+    expect(failed.status).toBe(502);
+    await wait<void>((done) => failing.close(() => done()));
+
+    const off = createApp({
+      shellFile: resolve(dir, 'shell.html'),
+      cacheShell: true,
+      hmr: false,
+      frontend: stubFrontend,
+      lobby,
+      phlebasLobby,
+      catalog: () => scanGames(repo),
+      ideasWebhookUrl: undefined,
+    });
+    await wait<void>((done) => off.listen(0, '127.0.0.1', done));
+    const offAddress: AddressInfo | string | null = off.address();
+    const offPort = offAddress === null || typeof offAddress === 'string' ? 0 : offAddress.port;
+    const unconfigured = await fetch(`http://127.0.0.1:${offPort}/api/ideas`, { method: 'POST', headers, body: idea });
+    expect(unconfigured.status).toBe(503);
+    await wait<void>((done) => off.close(() => done()));
   });
 
   it('hands /games/<id>/<subpath> to the frontend', async () => {

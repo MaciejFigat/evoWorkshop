@@ -32,6 +32,7 @@ export type AppOptions = {
   lobby: LobbyLike;
   phlebasLobby: PhlebasLobbyLike;
   catalog: () => Catalog;
+  ideasWebhookUrl: string | undefined;
 };
 
 const MAX_FRAME_BYTES = 64 * 1024;
@@ -89,7 +90,11 @@ export function createApp(options: AppOptions): Server {
       return;
     }
     if (pathname === '/api' || pathname.startsWith('/api/')) {
-      handleApi(req, res, pathname, options.catalog(), () => options.lobby.tables());
+      await handleApi(req, res, pathname, {
+        catalog: options.catalog(),
+        tables: () => options.lobby.tables(),
+        ideasWebhookUrl: options.ideasWebhookUrl,
+      });
       return;
     }
     const game = GAME_PATH.exec(pathname);

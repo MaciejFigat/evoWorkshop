@@ -44,9 +44,11 @@ docs/passports/<id>.md      one passport per game, written before its code
 Everything is on one origin, http://localhost:5180:
 
 - Pages: `/`, `/library`, `/game/:id`, `/game/:id/:tab`, `/stats`, `/stats/board`, `/add`,
-  `/my`. The server renders `shell.html` with mock data and injects `window.EVO_CATALOG`,
+  `/my`, `/ideas`. The server renders `shell.html` with mock data and injects `window.EVO_CATALOG`,
   the list of games it found, before the page's own scripts.
-- JSON: `/api/games`, `/api/games/:id`, `/api/tables`.
+- JSON: `/api/games`, `/api/games/:id`, `/api/tables`. `POST /api/ideas` posts an idea to the
+  #workshop-ideas Slack workflow: copy `.env.example` to `.env` and set `IDEAS_WEBHOOK_URL`;
+  without it the Ideas page answers that the webhook is not configured.
 - Game pages: `/games/<id>/`. In dev Vite transforms them on the fly; in prod they come from
   `apps/web/dist`.
 - WebSocket: `/ws`, the Alchemy Brawl lobby.

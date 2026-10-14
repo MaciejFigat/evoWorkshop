@@ -262,6 +262,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--l
 .field input, .field select { width: 100%; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
 .form-grid .wide { grid-column: 1 / -1; }
+.idea-form { max-width: 760px; }
+.idea-form-actions { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+.idea-status { font-size: 13px; }
+.idea-status.ok { color: var(--good); }
+.idea-status.err { color: var(--bad); }
 
 /* Panels, tiles, tables */
 .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 18px 20px; min-width: 0; }
@@ -1587,7 +1592,7 @@ main:focus { outline: none; }
       game.demo = { kind: 'bundled', src: entry.entryUrl };
       game.version = entry.version;
       game.core = entry.core || game.core;
-      if (!game.cover) game.cover = entry.coverUrl;
+      game.cover = entry.coverUrl;
       return;
     }
     GAMES.push({
@@ -2315,6 +2320,7 @@ main:focus { outline: none; }
     manageDraft: { file: null },
     lastRouteKey: '',
     search: { q: '', open: false, index: 0 },
+    idea: { status: 'idle', reason: '' },
   };
 
   // ---------- helpers ----------
@@ -2556,7 +2562,7 @@ main:focus { outline: none; }
     return (
       '<header class="topbar"><div class="topbar-inner">' +
       '<a class="brand" href="/" aria-label="EVO Playground lobby"><img src="' + BRAND_LOGO + '" alt="EVO Playground"></a>' +
-      '<nav class="nav" aria-label="Main">' + link('/', 'lobby', 'Lobby') + link('/library', 'library', 'Library', '') + link('/stats', 'stats', 'Stats') + '</nav>' +
+      '<nav class="nav" aria-label="Main">' + link('/', 'lobby', 'Lobby') + link('/library', 'library', 'Library', '') + link('/stats', 'stats', 'Stats') + link('/ideas', 'ideas', 'Ideas') + '</nav>' +
       '<div class="top-search" role="search">' + icon('search') + '<label class="sr-only" for="global-search">Search games and people</label>' +
       '<input type="search" id="global-search" autocomplete="off" spellcheck="false" placeholder="Search games and people" value="' + esc(ui.search.q) + '" role="combobox" aria-controls="search-results" aria-expanded="' + ui.search.open + '">' +
       '<kbd aria-hidden="true">/</kbd><div id="search-results" class="search-results" role="listbox"' + (ui.search.open && ui.search.q.trim() ? '' : ' hidden') + '>' + searchResults() + '</div></div>' +
@@ -2730,12 +2736,17 @@ main:focus { outline: none; }
       '<span class="site-foot-note">Prototype · your votes and sessions stay in this browser</span></div></footer>';
   }
 
+  const TRENDING_SIDE = ['alchemy-brawl', 'warsaw-streets', 'relic-rush'];
+
   function lobbyPage() {
     const games = visibleGames();
     const playable = games.filter((g) => g.format !== 'idea');
     const byWeek = playable.slice().sort((a, b) => gameStats(b.id, 7).sessions - gameStats(a.id, 7).sessions);
     const featured = byWeek[0];
-    const shown = new Set(byWeek.slice(0, 4).map((g) => g.id));
+    // The side column of Trending is pinned for the demo; a pinned game missing from the catalog gives its slot back to the weekly ranking.
+    const pinned = TRENDING_SIDE.map((id) => playable.find((g) => g.id === id)).filter((g) => g && g !== featured);
+    const side = pinned.concat(byWeek.filter((g) => g !== featured && !pinned.includes(g))).slice(0, 3);
+    const shown = new Set([featured, ...side].filter(Boolean).map((g) => g.id));
     const latest = games.filter((g) => !shown.has(g.id)).sort((a, b) => a.addedDaysAgo - b.addedDaysAgo).slice(0, 4);
     latest.forEach((g) => shown.add(g.id));
     const rated = playable.filter((g) => !shown.has(g.id)).sort((a, b) => ratingOf(b).avg - ratingOf(a).avg).slice(0, 4);
@@ -2791,7 +2802,7 @@ main:focus { outline: none; }
           '<article class="featured"><a href="/game/' + featured.id + '" class="cover" aria-label="' + esc(featured.title) + '">' + coverHtml(featured) + '</a><span class="featured-flag chip">' + icon('flame') + '#1 this week</span>' +
           '<div class="featured-body"><div><h3>' + esc(featured.title) + '</h3><div class="byline" style="margin-top:6px">' + avatar(userById(featured.authorId), 'sm') + '<b>' + esc(userById(featured.authorId).name) + '</b><span>· ' + fmt(fStats.sessions) + ' sessions, ' + fStats.players + ' players this week</span></div></div>' +
           '<div style="display:flex;gap:8px"><a class="btn" href="/game/' + featured.id + '">Details</a><button class="btn btn-primary" data-action="play" data-id="' + featured.id + '">' + PLAY + 'Play</button></div></div></article>' +
-          '<div class="side-games">' + byWeek.slice(1, 4).map(sideGame).join('') + '</div></div></section>'
+          '<div class="side-games">' + side.map(sideGame).join('') + '</div></div></section>'
         : '') +
 
       (jump.length
@@ -3355,6 +3366,22 @@ main:focus { outline: none; }
     return errors[key] ? '<span class="err">' + esc(errors[key]) + '</span>' : '';
   }
 
+  // Ideas go to Slack through the server (POST /api/ideas), so the webhook stays server-side.
+  function ideasPage() {
+    const s = ui.idea;
+    const status = s.status === 'sent' ? '<span class="idea-status ok">Posted. Check the channel.</span>' :
+      s.status === 'error' ? '<span class="idea-status err">' + esc(s.reason) + '</span>' : '';
+    return (
+      '<div class="page-head"><div><h1>Submit an idea</h1><p>Posts straight to the #workshop-ideas Slack channel. Comment and reply there. If it moves forward, the next step is a passport in docs/passports before any code.</p></div></div>' +
+      '<form class="panel idea-form" data-form="idea"><div class="form-grid">' +
+      '<div class="field"><label for="idea-title"><span>Title</span></label><input type="text" id="idea-title" name="title" maxlength="200" placeholder="Plinko with a side bet" required></div>' +
+      '<div class="field"><label for="idea-by"><span>Your Slack name</span></label><input type="text" id="idea-by" name="submittedBy" maxlength="100" placeholder="How you are listed in Slack" required></div>' +
+      '<div class="field wide"><label for="idea-desc"><span>Description</span></label><textarea id="idea-desc" name="description" rows="5" maxlength="4000" placeholder="What is the mechanic, what core does it map to, why is it fun" required></textarea></div>' +
+      '<div class="field wide"><label for="idea-img"><span>Concept art URL</span></label><input type="url" id="idea-img" name="imageUrl" placeholder="https://…"><small>Optional</small></div>' +
+      '</div><div class="idea-form-actions"><button type="submit" class="btn btn-primary"' + (s.status === 'sending' ? ' disabled' : '') + '>' + (s.status === 'sending' ? 'Posting…' : 'Post to Slack') + '</button>' + status + '</div></form>'
+    );
+  }
+
   function addPage() {
     const w = ui.wiz;
     const d = w.draft;
@@ -3787,6 +3814,7 @@ main:focus { outline: none; }
       active = 'stats';
     }
     else if (view === 'add') body = addPage();
+    else if (view === 'ideas') body = ideasPage();
     else if (view === 'my') body = myGamesPage();
     else {
       body = lobbyPage();
@@ -4228,6 +4256,25 @@ main:focus { outline: none; }
 
   document.addEventListener('submit', (e) => {
     const form = e.target;
+    if (form.dataset.form === 'idea') {
+      e.preventDefault();
+      if (ui.idea.status === 'sending') return;
+      const data = new FormData(form);
+      const idea = { title: data.get('title'), description: data.get('description'), imageUrl: data.get('imageUrl'), submittedBy: data.get('submittedBy') };
+      ui.idea = { status: 'sending', reason: '' };
+      renderPage();
+      fetch('/api/ideas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(idea) })
+        .then((res) => res.json().then((body) => ({ ok: res.ok, body })))
+        .then(({ ok, body }) => {
+          ui.idea = ok ? { status: 'sent', reason: '' } : { status: 'error', reason: body.error === 'webhook_not_configured' ? 'IDEAS_WEBHOOK_URL is not set on the server (see .env.example)' : 'Could not post: ' + body.error };
+          renderPage();
+        })
+        .catch(() => {
+          ui.idea = { status: 'error', reason: 'Network error reaching the server' };
+          renderPage();
+        });
+      return;
+    }
     if (form.dataset.form !== 'comment') return;
     e.preventDefault();
     const text = form.querySelector('textarea').value.trim();
