@@ -500,7 +500,7 @@ code {
   flex: 0 1 auto;
   width: 100%;
   aspect-ratio: 16 / 9;
-  max-height: calc(100% - 196px);
+  max-height: calc(100% - 210px);
   min-height: 0;
 }
 
@@ -548,59 +548,50 @@ code {
    hint hangs under the strip into the spare room below. ---- */
 .hud {
   flex: none;
-  height: 96px;
+  height: 110px;
   margin-top: 8px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
+/* The action block: status, info chips and buttons share one fixed width and the same edges, so
+   they read as a block without a frame. Three buttons of 150 and two gaps of 12. */
 .hud-actions {
-  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 2px;
-  height: 96px;
-  min-width: 260px;
-  max-width: 640px;
-}
-
-/* Without buttons the status takes their room: a Round 1 or showdown result reads in full. */
-.hud-actions.no-actions .hud-status {
-  height: 54px;
-  line-height: 18px;
-  white-space: normal;
-  text-align: center;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.hud-actions.no-actions .hud-hint {
-  position: static;
-  width: auto;
-  max-width: 100%;
-  transform: none;
+  gap: 8px;
+  width: 474px;
+  height: 110px;
 }
 
 .hud-status {
-  max-width: 100%;
-  height: 16px;
-  line-height: 16px;
+  height: 18px;
+  line-height: 18px;
   font-size: 14px;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Without buttons the status takes their room: a Round 1 or showdown result reads in full. */
+.hud-actions.no-actions .hud-status {
+  height: 54px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .act-chips {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   height: 24px;
-  max-width: 100%;
 }
 
 .act-chip {
@@ -629,19 +620,14 @@ code {
 }
 
 .hud-buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 12px;
   height: 52px;
 }
 
 .hud-hint {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  width: 640px;
-  transform: translateX(-50%);
   margin: 0;
   height: 14px;
   line-height: 14px;
@@ -653,9 +639,7 @@ code {
   white-space: nowrap;
 }
 
-/* The action buttons: equal size, the label uppercase with its amount in lighter small text beside it. */
 .act {
-  width: 150px;
   height: 52px;
   padding: 0;
   border-radius: 10px;

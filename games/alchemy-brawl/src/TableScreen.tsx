@@ -89,7 +89,7 @@ function decideFrame(net: Net, hand: HandView, picked: Selection): Frame {
         <Action kind="stay" disabled={show === null} onClick={stay} />
       </>
     ),
-    hint: 'No chips at risk in Round 1. The shown card stays face up until the end of the hand.',
+    hint: '',
   };
 }
 
@@ -98,7 +98,6 @@ function betFrame(net: Net, table: TableView, hand: HandView): Frame {
   const nameOf = nameResolver(table, hand);
   const yourTurn = you !== null && you.legalBets.length > 0;
   const call = yourTurn && you.legalBets.includes('call') ? betAmount(hand, 'call') : 0;
-  const rate = call > 0 ? ((call / (hand.finalPot + call)) * 100).toFixed(1) : null;
   const actor = hand.betting?.actor;
   const chips = (
     <>
@@ -115,7 +114,7 @@ function betFrame(net: Net, table: TableView, hand: HandView): Frame {
     status: 'Your turn.',
     chips,
     actions: legal.map((kind) => <Action key={kind} kind={kind} amount={betAmount(hand, kind)} onClick={() => net.send({ type: 'bet', kind })} />),
-    hint: rate === null ? '' : `Call ${call} into ${hand.finalPot}: worth it if you win more than ${rate}% of the time.`,
+    hint: '',
   };
 }
 
@@ -209,9 +208,7 @@ export function TableScreen({
             </span>
             {frame.chips !== null && <div className="act-chips">{frame.chips}</div>}
             {frame.actions !== null && <div className="hud-buttons">{frame.actions}</div>}
-            <p className="hud-hint" title={frame.hint}>
-              {frame.hint}
-            </p>
+            {frame.actions === null && frame.hint !== '' && <p className="hud-hint">{frame.hint}</p>}
           </div>
         </footer>
       </div>
