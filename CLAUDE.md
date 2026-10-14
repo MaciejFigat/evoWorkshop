@@ -35,27 +35,25 @@ apps/web/                      @evo/web: the single server, http://localhost:518
   src/server/catalog.ts        scanGames(repo) → { games, errors }: the folder tree is the registry; catalogEntry(game) → urls
   src/server/*.ts              Node http + ws; Vite middleware mode in dev, apps/web/dist in prod
   pages/shell.html             EVO Playground pages: lobby, library grid, game page, stats, gamers board, add, my games; mock data inline
-  games/<id>/                  one folder per game page: manifest.json, index.html, main.ts, cover.svg
-  games/_template/             copied by yarn new-game; folders starting with "_" are not games
-  games/project-phlebas/       solo CS-history space shooter, feel experiment — see its passport
-  vite.config.ts               Vite root = repo root; every game page is a build input; outDir apps/web/dist; vitest over src
-  tsconfig.json                the game pages (DOM); tsconfig.server.json: src/server (Node, erasable syntax only)
-apps/alchemy-brawl/            Alchemy Brawl: a multiplayer table game with its own tables, one folder
-  spec.md                      the rules, v0.3
-  assets/                      SVG art: Cards, HUD, UI, Items, Props
-  shared/                      @evo/brawl-shared: pure hand engine, scoring, per-seat view, zod protocol
-  server/                      @evo/brawl-server: lobby, tables by code, timers, bots; mounted by apps/web on /ws
-  client/                      @evo/brawl-client: the game page at /games/alchemy-brawl/ (React lobby + CSS HUD, Phaser table)
-apps/project-phlebas-coop/     2-player co-op port of games/project-phlebas, one folder
-  shared/                      @evo/project-phlebas-coop-shared: zod protocol — room/share-link
+  vite.config.ts               Vite root = repo root; every games/<id>/ page is a build input; outDir apps/web/dist; vitest over src
+  tsconfig.json                typechecks games/*/main.ts (DOM); tsconfig.server.json: src/server (Node, erasable syntax only)
+games/                         every game, one folder each; the folder tree is the registry
+  <id>/                        a game page: manifest.json, index.html, main.ts, cover (d20, sunset-break, warsaw-streets)
+  _template/                   copied by yarn new-game; folders starting with "_" are not games
+  project-phlebas/             solo CS-history space shooter, feel experiment — see its passport
+  alchemy-brawl/               a game with its own tables, still one folder: @evo/alchemy-brawl
+    manifest.json index.html cover.svg spec.md assets/   the page, the rules (v0.3), the SVG art
+    src/                       the client: React lobby + CSS HUD, Phaser table
+    engine/                    @evo/alchemy-brawl/engine: pure hand engine, scoring, per-seat view, zod protocol
+    tables/                    @evo/alchemy-brawl/tables: lobby, tables by code, timers, bots; mounted by apps/web on /ws
+  project-phlebas-coop/        2-player co-op port of games/project-phlebas, one folder: @evo/project-phlebas-coop
+    manifest.json index.html cover.svg src/   the page; host-relay netcode — the host's browser
+                                runs the actual simulation, the guest only renders and sends input (see its passport for why)
+    shared/                    @evo/project-phlebas-coop/shared: zod protocol — room/share-link
                                 messages plus Snapshot (positions, bullets, enemies, score, lives)
-  logic/                       @evo/project-phlebas-coop-logic: Lobby/Room, create/join rooms by a
+    logic/                     @evo/project-phlebas-coop/logic: Lobby/Room, create/join rooms by a
                                 short code; mounted by apps/web on /games/project-phlebas-coop/ws
                                 (not bare /ws — see "Routes"), never runs the game itself
-  client/                      @evo/project-phlebas-coop-client: the game page at
-                                /games/project-phlebas-coop/; host-relay netcode — the host's
-                                browser runs the actual simulation, the guest only renders and
-                                sends input (see its passport for why)
 packages/protocol/             zod: manifest, host↔game messages; parseWith → { ok, value } | { ok, reason }
 packages/rng/                  mulberry32 → { next, int, shuffle }; the only place Math.random may appear
 packages/game-sdk/             connect(onInit): game:ready → host:init → session { seed, sessionId, sandbox, rng, emit }
@@ -63,18 +61,23 @@ scripts/new-game.mjs           yarn new-game <id> [Title]: copies the template, 
 docs/passports/<id>.md         one passport per game, written before its code
 ```
 
-A game that needs its own server and tables keeps one folder `apps/<id>/`, with workspaces
-`shared` (pure engine and the zod protocol, used by both sides), `server` (or `logic`, if it's
-a dumb relay rather than something that owns real game state — see `project-phlebas-coop`) and
-`client`. The server has no process of its own: `apps/web` imports it and mounts its `Lobby` on
-a ws path (`/ws` for the first one, Alchemy Brawl; a per-game path like
-`/games/<id>/ws` for any game added after it, so a second multiplayer game doesn't have to
-share Alchemy Brawl's bare `/ws` — see `app.ts`'s two `WebSocketServer({ noServer: true })`
-instances and its single `'upgrade'` dispatcher). The client is a game page at `/games/<id>/`,
-which the web server maps onto `apps/<id>/client/`; it opens from the library like any other
-game and still emits `round` through `@evo/game-sdk`, so the same telemetry covers it. The
-server owns every hidden bit of state and sends each seat only its own view; the client
-renders that view and the events. The root `workspaces` lists `apps/<id>/*`.
+A game that needs its own server-side state is still one folder `games/<id>/`, as
+`games/alchemy-brawl/` and `games/project-phlebas-coop/` are: the page (`manifest.json`,
+`index.html`, `src/`), plus one or two subfolders of pure server-side code — `engine`/`tables`
+for Alchemy Brawl's hand engine and lobby, `shared`/`logic` for Project Phlebas Co-op's zod
+protocol and relay lobby (name them for what they hold, not for a fixed pair). The folder is
+one workspace package with a subpath export per subfolder (`@evo/<id>/tables`,
+`@evo/project-phlebas-coop/logic`, and so on). The server-side folders have no process of
+their own: `apps/web` imports them and mounts their `Lobby` on a ws path — Alchemy Brawl's
+bare `/ws`, since it was first; any game added after it gets its own path instead
+(`/games/<id>/ws`; Project Phlebas Co-op uses `/games/project-phlebas-coop/ws` — see "Routes",
+and `app.ts`'s two `WebSocketServer({ noServer: true })` instances and its single `'upgrade'`
+dispatcher), so a second multiplayer game never has to share the first one's endpoint or
+protocol. The page opens from the library like any other game and still emits `round` through
+`@evo/game-sdk`, so the same telemetry covers it. The server-side code owns every hidden bit
+of state and sends each seat only its own view; the client renders that view and the events.
+The root `workspaces` lists `games/*`; a plain game page has no `package.json` and is not a
+workspace.
 
 **Important `ws` gotcha, if a third multiplayer game joins this list**: don't attach a second
 `WebSocketServer` the obvious way (`new WebSocketServer({ server: http, path })`, one per
@@ -116,8 +119,8 @@ postMessage protocol. Each multiplayer game's client connects to its own
 
 ## Game contract
 
-A game is a folder `apps/web/games/<id>/` (or `apps/<id>/client/` for a game with its own
-server) with `manifest.json`, `index.html`, `main.ts` (or `src/`) and a cover. Nothing else
+A game is a folder `games/<id>/` with `manifest.json`, `index.html`, `main.ts` (or `src/`
+for a game with its own tables) and a cover. Nothing else
 is registered: the server scans the folder tree (`catalog.ts`), and `yarn test` fails on a
 manifest that does not parse, an `id` that differs from the folder name, a missing `entry`
 or `cover`, or a duplicate id. Start a game with `yarn new-game <id>`; the template already
@@ -233,11 +236,11 @@ bonus features).
 - The stack is pinned: React + Vite, zod, vitest, ws for the server, Phaser for the board
   (tweens, particles, camera shake and flash, sprite-sheet animations are built in).
 - Servers run TypeScript directly on Node's type stripping, with no build step: this covers
-  `apps/web/src/server`, `apps/alchemy-brawl/server`, `apps/project-phlebas-coop/logic` and the
-  shared code they load (`apps/alchemy-brawl/shared`, `apps/project-phlebas-coop/shared`).
+  `apps/web/src/server`, `games/alchemy-brawl/tables`, `games/project-phlebas-coop/logic` and
+  the pure code they load (`games/alchemy-brawl/engine`, `games/project-phlebas-coop/shared`).
   Relative imports there carry the `.ts` extension, and only erasable syntax is allowed (no
   enums, namespaces or parameter properties); `erasableSyntaxOnly` enforces it. Workspace
-  imports use package names (`@evo/brawl-shared`, `@evo/project-phlebas-coop-shared`,
+  imports use package names (`@evo/alchemy-brawl/engine`, `@evo/project-phlebas-coop/shared`,
   `@evo/protocol`, `@evo/rng`, `@evo/game-sdk`).
   Ask before adding any new dependency.
 - No `any`, no non-null assertions, no `as` except at parsing boundaries. `as const` does not

@@ -23,15 +23,15 @@ yarn new-game <id> [Title words...]
 apps/web/                   @evo/web, the single server
   src/server/               Node http + ws; Vite middleware in dev, apps/web/dist in prod; catalog.ts scans the games
   pages/shell.html          EVO Playground pages: lobby, library, game page, stats, gamers board, add, my games (mock data)
-  games/<id>/               one folder per game page: manifest.json, index.html, main.ts, cover.svg
-  games/_template/          copied by yarn new-game
-  vite.config.ts            Vite root = repo root, every game page is a build input
-apps/alchemy-brawl/         Alchemy Brawl, a multiplayer table game in one folder
-  spec.md                   the rules, v0.3
-  assets/                   SVG art: Cards, HUD, UI, Items, Props
-  shared/                   @evo/brawl-shared: pure hand engine, scoring, per-seat view, zod protocol
-  server/                   @evo/brawl-server: lobby, tables by code, timers, bots; mounted by apps/web on /ws
-  client/                   @evo/brawl-client: the game page at /games/alchemy-brawl/ (React lobby, CSS HUD, Phaser table)
+  vite.config.ts            Vite root = repo root, every games/<id>/ page is a build input
+games/                      every game, one folder each
+  d20/  sunset-break/  warsaw-streets/   game pages: manifest.json, index.html, main.ts, cover
+  _template/                copied by yarn new-game
+  alchemy-brawl/            a multiplayer table game, still one folder (@evo/alchemy-brawl)
+    manifest.json index.html cover.svg spec.md assets/
+    src/                    the client: React lobby, CSS HUD, Phaser table
+    engine/                 @evo/alchemy-brawl/engine: pure hand engine, scoring, per-seat view, zod protocol
+    tables/                 @evo/alchemy-brawl/tables: lobby, tables by code, timers, bots; mounted by apps/web on /ws
 packages/protocol/          zod schemas: manifest, host↔game messages
 packages/rng/               mulberry32 → { next, int, shuffle }; the only place Math.random may appear
 packages/game-sdk/          connect(onInit): handshake with the host, seed → rng, emit()
@@ -58,7 +58,7 @@ postMessage protocol below.
 
 Open http://localhost:5180, pick Alchemy Brawl in the library, enter a name, create a table
 or join one by its code, and add bots to fill the seats. Each browser tab is a separate
-player, and a reload keeps the seat. Rules: `apps/alchemy-brawl/spec.md` (v0.3); passport:
+player, and a reload keeps the seat. Rules: `games/alchemy-brawl/spec.md` (v0.3); passport:
 `docs/passports/alchemy-brawl.md`.
 
 The rules in five lines:
@@ -86,15 +86,15 @@ bank from the spec is not implemented: the action timer alone decides.
 yarn new-game mines Mine Grid
 ```
 
-That creates `apps/web/games/mines/` from the template and the game is already on the
+That creates `games/mines/` from the template and the game is already on the
 server at `/games/mines/` and in the library: there is no registry file to edit. Then write
 `docs/passports/mines.md` and replace `main.ts`. Every game's `index.html` is a Vite page of
 its own, so `main.ts` is strict TypeScript with the same rules as the server and can import
 `@evo/game-sdk` and `@evo/rng`.
 
-A game with its own server lives in `apps/<id>/` with `shared`, `server` and `client`
-workspaces; the server mounts `apps/<id>/client/` at `/games/<id>/`, and its game page is
-a normal entry in the library.
+A game with its own tables is still one folder `games/<id>/`: the page plus `engine/` and
+`tables/`, exported as `@evo/<id>/engine` and `@evo/<id>/tables`; the server imports the
+tables and mounts them on `/ws`, and the page is a normal entry in the library.
 
 `yarn test` validates every manifest: schema, `id` equal to the folder name, `entry` and
 `cover` present on disk, unique ids. A broken folder fails the tests instead of silently

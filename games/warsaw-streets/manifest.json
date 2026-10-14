@@ -1,0 +1,8 @@
+{
+  "id": "warsaw-streets",
+  "version": "0.3.0",
+  "title": "Warsaw Streets",
+  "description": "Early-90s style side-scrolling beat 'em up: Nina against the mafia goons on the Vistula boulevard. Execution skill, no stakes: a feel experiment for the break-time arcade, not a candidate for embedding.",
+  "cover": "cover.jpg",
+  "entry": "index.html"
+}

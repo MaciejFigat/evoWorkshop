@@ -1,0 +1,29 @@
+{
+  "name": "@evo/project-phlebas-coop",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./shared": "./shared/index.ts",
+    "./logic": "./logic/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.shared.json && tsc --noEmit -p tsconfig.logic.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@evo/game-sdk": "workspace:*",
+    "@evo/protocol": "workspace:*",
+    "@evo/rng": "workspace:*",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript7": "npm:typescript@^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}

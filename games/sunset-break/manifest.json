@@ -1,0 +1,9 @@
+{
+  "id": "sunset-break",
+  "version": "0.4.0",
+  "title": "Sunset Break",
+  "description": "Crash game on a surf wave: the multiplier climbs while the wave builds, cash out before it breaks. Core: ladder.",
+  "cover": "cover.jpg",
+  "entry": "index.html",
+  "core": "ladder"
+}

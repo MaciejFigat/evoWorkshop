@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
-import { DEFAULT_TABLE } from '@evo/brawl-shared';
-import { Lobby } from '@evo/brawl-server';
-import { Lobby as PhlebasLobby } from '@evo/project-phlebas-coop-logic';
+import { DEFAULT_TABLE } from '@evo/alchemy-brawl/engine';
+import { Lobby } from '@evo/alchemy-brawl/tables';
+import { Lobby as PhlebasLobby } from '@evo/project-phlebas-coop/logic';
 import { createServer } from 'vite';
 import { createApp } from './app.ts';
 import { scanGames, type Catalog } from './catalog.ts';

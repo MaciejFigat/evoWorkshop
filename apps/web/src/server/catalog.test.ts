@@ -15,8 +15,8 @@ describe('scanGames on the repository', () => {
 
   it('finds d20 and alchemy-brawl in their folders', () => {
     const rels = Object.fromEntries(catalog.games.map((game) => [game.id, game.rel]));
-    expect(rels['d20']).toBe('apps/web/games/d20');
-    expect(rels['alchemy-brawl']).toBe('apps/alchemy-brawl/client');
+    expect(rels['d20']).toBe('games/d20');
+    expect(rels['alchemy-brawl']).toBe('games/alchemy-brawl');
   });
 
   it('skips folders starting with an underscore', () => {
@@ -44,7 +44,7 @@ describe('scanGames on the repository', () => {
       core: 'draw',
       entryUrl: '/games/d20/',
       coverUrl: '/games/d20/cover.svg',
-      rel: 'apps/web/games/d20',
+      rel: 'games/d20',
     });
   });
 });
@@ -53,7 +53,7 @@ describe('scanGames on a broken tree', () => {
   let root = '';
 
   function game(id: string, manifest: string, files: string[]): void {
-    const dir = resolve(root, 'apps/web/games', id);
+    const dir = resolve(root, 'games', id);
     mkdirSync(dir, { recursive: true });
     writeFileSync(resolve(dir, 'manifest.json'), manifest);
     for (const file of files) {
@@ -78,13 +78,13 @@ describe('scanGames on a broken tree', () => {
     expect(catalog.games.map((entry) => entry.id)).toEqual(['good']);
     expect(catalog.errors).toHaveLength(3);
     expect(catalog.errors.map((error) => error.rel).sort()).toEqual([
-      'apps/web/games/broken',
-      'apps/web/games/nocover',
-      'apps/web/games/other',
+      'games/broken',
+      'games/nocover',
+      'games/other',
     ]);
     const reasons = Object.fromEntries(catalog.errors.map((error) => [error.rel, error.reason]));
-    expect(reasons['apps/web/games/other']).toBe('id "mismatch" does not match folder "other"');
-    expect(reasons['apps/web/games/nocover']).toBe('cover "cover.svg" is missing');
-    expect(reasons['apps/web/games/broken']).toMatch(/JSON/);
+    expect(reasons['games/other']).toBe('id "mismatch" does not match folder "other"');
+    expect(reasons['games/nocover']).toBe('cover "cover.svg" is missing');
+    expect(reasons['games/broken']).toMatch(/JSON/);
   });
 });

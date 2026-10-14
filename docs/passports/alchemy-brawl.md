@@ -1,7 +1,7 @@
 ## Passport: Alchemy Brawl
 
 Kind: game
-Core: none. The pot goes to the best three-card poker combination made of a hidden cast plus two shared table cards; the full rules are in `apps/alchemy-brawl/spec.md` (v0.3)
+Core: none. The pot goes to the best three-card poker combination made of a hidden cast plus two shared table cards; the full rules are in `games/alchemy-brawl/spec.md` (v0.3)
 Source of randomness: shuffled deck, one server seed per hand; the client never draws
 Player decisions:
 - Round 1, stay or skip, all seats at once: which card to risk as the cast and which card to show. Rewards reading the table cards and bluffing with the shown card, which stays public for the rest of the hand
