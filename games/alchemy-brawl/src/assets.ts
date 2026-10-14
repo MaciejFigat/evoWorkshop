@@ -1,7 +1,7 @@
 import type { Card } from '@evo/alchemy-brawl/engine';
 
 // Vite rewrites each path to a served url (dev: /games/alchemy-brawl/assets/..., prod: hashed in dist/assets).
-const files = import.meta.glob('../../assets/**/*.svg', { eager: true, query: '?url', import: 'default' });
+const files = import.meta.glob('../assets/**/*.svg', { eager: true, query: '?url', import: 'default' });
 
 // Keys are repository paths relative to the assets folder without the extension: 'Cards/fire-01', 'HUD/table'.
 export const ASSETS: Record<string, string> = Object.fromEntries(
