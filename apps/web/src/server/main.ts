@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { DEFAULT_TABLE } from '@evo/brawl-shared';
 import { Lobby } from '@evo/brawl-server';
+import { Lobby as PhlebasLobby } from '@evo/project-phlebas-coop-logic';
 import { createServer } from 'vite';
 import { createApp } from './app.ts';
 import { scanGames, type Catalog } from './catalog.ts';
@@ -16,6 +17,7 @@ const scanned: Catalog = scanGames(repo);
 const catalog = dev ? () => scanGames(repo) : () => scanned;
 
 const lobby = new Lobby(DEFAULT_TABLE);
+const phlebasLobby = new PhlebasLobby();
 
 // The http server exists before Vite so its HMR websocket can share the same listener.
 let frontend: Frontend = distFrontend(resolve(repo, 'apps/web/dist'));
@@ -28,6 +30,7 @@ const server = createApp({
     serveOther: (req, res) => frontend.serveOther(req, res),
   },
   lobby,
+  phlebasLobby,
   catalog,
 });
 

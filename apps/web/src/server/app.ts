@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { Duplex } from 'node:stream';
 import type { LobbyTable, ServerMessage } from '@evo/brawl-shared';
+import type { ServerMessage as PhlebasServerMessage } from '@evo/project-phlebas-coop-shared';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { handleApi } from './api.ts';
 import { catalogEntry, type Catalog } from './catalog.ts';
@@ -9,11 +10,17 @@ import type { Frontend } from './frontend.ts';
 import { isPageRoute, renderShell, shellReader } from './pages.ts';
 
 export type Connection = { send(message: ServerMessage): void };
+export type PhlebasConnection = { send(message: PhlebasServerMessage): void };
 
 export type LobbyLike = {
   receive(conn: Connection, raw: string): void;
   disconnect(conn: Connection): void;
   tables(): LobbyTable[];
+};
+
+export type PhlebasLobbyLike = {
+  receive(conn: PhlebasConnection, raw: string): void;
+  disconnect(conn: PhlebasConnection): void;
 };
 
 export type AppOptions = {
@@ -23,11 +30,16 @@ export type AppOptions = {
   hmr: boolean;
   frontend: Frontend;
   lobby: LobbyLike;
+  phlebasLobby: PhlebasLobbyLike;
   catalog: () => Catalog;
 };
 
 const MAX_FRAME_BYTES = 64 * 1024;
 const GAME_PATH = /^\/games\/([a-z0-9-]+)(?:\/(.*))?$/;
+// Project Phlebas Co-op's ws lives under its own game path, not bare /ws like Alchemy
+// Brawl — the day a third multiplayer game joins, each one gets a path here rather than
+// every game racing for the one bare /ws.
+const PHLEBAS_WS_PATH = '/games/project-phlebas-coop/ws';
 
 const VITE_PROTOCOLS = ['vite-hmr', 'vite-ping'];
 
@@ -45,6 +57,23 @@ function attach(socket: WebSocket, lobby: LobbyLike): void {
     }
   });
   // ws emits 'error' on a bad frame and closes the socket; without a listener Node would rethrow it.
+  socket.on('error', () => socket.terminate());
+  socket.on('close', () => lobby.disconnect(conn));
+}
+
+function attachPhlebas(socket: WebSocket, lobby: PhlebasLobbyLike): void {
+  const conn: PhlebasConnection = {
+    send(message) {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify(message));
+      }
+    },
+  };
+  socket.on('message', (data, isBinary) => {
+    if (!isBinary) {
+      lobby.receive(conn, data.toString());
+    }
+  });
   socket.on('error', () => socket.terminate());
   socket.on('close', () => lobby.disconnect(conn));
 }
@@ -102,10 +131,15 @@ export function createApp(options: AppOptions): Server {
   });
 
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME_BYTES });
+  const phlebasWss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME_BYTES });
   server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     const pathname = (req.url ?? '/').split('?')[0] ?? '/';
     if (pathname === '/ws') {
       wss.handleUpgrade(req, socket, head, (ws) => attach(ws, options.lobby));
+      return;
+    }
+    if (pathname === PHLEBAS_WS_PATH) {
+      phlebasWss.handleUpgrade(req, socket, head, (ws) => attachPhlebas(ws, options.phlebasLobby));
       return;
     }
     const protocol = req.headers['sec-websocket-protocol'] ?? '';
@@ -113,6 +147,9 @@ export function createApp(options: AppOptions): Server {
       socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
     }
   });
-  server.on('close', () => wss.close());
+  server.on('close', () => {
+    wss.close();
+    phlebasWss.close();
+  });
   return server;
 }

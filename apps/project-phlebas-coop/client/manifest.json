@@ -1,0 +1,8 @@
+{
+  "id": "project-phlebas-coop",
+  "version": "0.1.0",
+  "title": "Project Phlebas Co-op",
+  "description": "2-player co-op port of Project Phlebas — create a room, share the link, fight together. Feel experiment, no core — see docs/passports/project-phlebas-coop.md.",
+  "cover": "cover.svg",
+  "entry": "index.html"
+}

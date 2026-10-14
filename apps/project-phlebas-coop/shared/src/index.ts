@@ -1,0 +1,15 @@
+export {
+  ROOM_SIZE,
+  parseClientMessage,
+  parseServerMessage,
+  type Bullet,
+  type ClientMessage,
+  type Enemy,
+  type EnemyKind,
+  type Phase,
+  type PlayerInfo,
+  type ServerError,
+  type ServerMessage,
+  type Snapshot,
+  type WeaponId,
+} from './protocol.ts';

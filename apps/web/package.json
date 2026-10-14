@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch-path=src --watch-path=../alchemy-brawl/server/src --watch-path=../alchemy-brawl/shared/src --disable-warning=ExperimentalWarning src/server/main.ts",
+    "dev": "node --watch-path=src --watch-path=../alchemy-brawl/server/src --watch-path=../alchemy-brawl/shared/src --watch-path=../project-phlebas-coop/logic/src --watch-path=../project-phlebas-coop/shared/src --disable-warning=ExperimentalWarning src/server/main.ts",
     "start": "NODE_ENV=production node --disable-warning=ExperimentalWarning src/server/main.ts",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
@@ -13,6 +13,8 @@
     "@evo/brawl-server": "workspace:*",
     "@evo/brawl-shared": "workspace:*",
     "@evo/game-sdk": "workspace:*",
+    "@evo/project-phlebas-coop-logic": "workspace:*",
+    "@evo/project-phlebas-coop-shared": "workspace:*",
     "@evo/protocol": "workspace:*",
     "@evo/rng": "workspace:*",
     "vite": "^8.3.0",

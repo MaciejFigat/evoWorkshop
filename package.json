@@ -5,6 +5,7 @@
   "workspaces": [
     "apps/*",
     "apps/alchemy-brawl/*",
+    "apps/project-phlebas-coop/*",
     "packages/*"
   ],
   "scripts": {
