@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WARSAW STREETS - sprite extractor</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; padding: 24px; background: #14141f; color: #d8dcff; font: 14px/1.5 system-ui, sans-serif; }
+    h1 { margin: 0 0 4px; font-size: 20px; }
+    p { max-width: 70ch; margin: 6px 0; color: #aab; }
+    code { background: #23233a; padding: 1px 5px; border-radius: 3px; }
+    #drop { margin: 16px 0; padding: 22px; border: 2px dashed #4a4a78; border-radius: 8px; text-align: center; cursor: pointer; }
+    #drop.over { border-color: #ff6fb5; background: #1d1d30; }
+    .sheet { margin: 18px 0; padding: 12px; background: #1b1b2b; border-radius: 8px; }
+    .sheet h2 { margin: 0 0 8px; font-size: 16px; }
+    canvas { max-width: 100%; image-rendering: pixelated; background: #46823f; display: block; margin: 8px 0; }
+    button, a.btn { display: inline-block; margin: 0 8px 4px 0; padding: 6px 12px; border: 0; border-radius: 5px; background: #ff6fb5; color: #14141f; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+    #log { white-space: pre-wrap; color: #8c8; }
+    #log.err { color: #f88; }
+  </style>
+</head>
+<body>
+  <h1>Sprite extractor</h1>
+  <p>Cuts the animation frames out of the concept sheets and builds the transparent atlases the game loads. Runs entirely in the browser; no Python, no server.</p>
+  <p>Select (or drop) all the files from <code>assets/reference/</code> (at least the ones named in <code>manifest.js</code>), then save the downloads into <code>assets/sprites/</code> (the <code>.png</code>) and <code>data/</code> (the <code>atlas_*.js</code>), replacing the old ones.</p>
+
+  <div id="drop">Drop the reference images here, or click to choose them<input id="files" type="file" accept="image/*" multiple hidden></div>
+  <div id="log"></div>
+  <div id="out"></div>
+
+  <script src="manifest.js"></script>
+  <script src="extract.js"></script>
+  <script>
+    const logEl = document.getElementById('log'), out = document.getElementById('out');
+    const log = (m, err) => { logEl.className = err ? 'err' : ''; logEl.textContent = m; };
+
+    async function handle(fileList) {
+      out.textContent = '';
+      const byName = {};
+      for (const f of fileList) byName[f.name] = f;
+      for (const [name, spec] of Object.entries(window.EXTRACT_MANIFEST)) {
+        const f = byName[spec.file];
+        if (!f) { log('Missing ' + spec.file + ' (needed for "' + name + '")', true); continue; }
+        try {
+          log('Extracting ' + name + ' ...');
+          await new Promise(r => setTimeout(r, 20));          // let the message paint
+          const sheet = await ExtractTool.decodeToImage(f);
+          const t0 = performance.now();
+          const res = ExtractTool.run(name, sheet, spec);
+          show(res, performance.now() - t0);
+        } catch (e) { console.error(e); log(name + ': ' + e.message, true); return; }
+      }
+      if (!logEl.className) log('Done. Save each .png into assets/sprites/ and each .js into data/.');
+    }
+
+    function show(res, ms) {
+      const box = document.createElement('div');
+      box.className = 'sheet';
+      const n = Object.keys(res.meta).length;
+      box.innerHTML = '<h2>' + res.name + ' - ' + n + ' frames, atlas ' + res.atlas.w + 'x' + res.atlas.h + ' (' + Math.round(ms) + ' ms)</h2>';
+      const c = ExtractTool.toCanvas(res.atlas);
+      c.style.width = res.atlas.w * 2 + 'px';
+      box.appendChild(c);
+      c.toBlob(b => {
+        const a = document.createElement('a');
+        a.className = 'btn'; a.textContent = 'Download ' + res.name + '.png';
+        a.href = URL.createObjectURL(b); a.download = res.name + '.png';
+        box.appendChild(a);
+      }, 'image/png');
+      const j = document.createElement('a');
+      j.className = 'btn'; j.textContent = 'Download atlas_' + res.name + '.js';
+      j.href = URL.createObjectURL(new Blob([res.js], { type: 'text/javascript' }));
+      j.download = 'atlas_' + res.name + '.js';
+      box.appendChild(j);
+      out.appendChild(box);
+      window.__results = window.__results || {}; window.__results[res.name] = res;
+    }
+
+    const drop = document.getElementById('drop'), input = document.getElementById('files');
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => handle(input.files));
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); handle(e.dataTransfer.files); });
+  </script>
+</body>
+</html>

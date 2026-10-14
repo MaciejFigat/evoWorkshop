@@ -14,82 +14,94 @@ A playground for game ideas the company can use. An idea comes in one of two kin
 We do not build games for their own sake: every idea has a passport that says which kind it
 is and how the company could ship it.
 
-The bench must answer three questions about every idea:
+The playground must answer three questions about every idea:
 
 1. Is it playable on its own, as rectangles and numbers, before any art.
 2. Does it fit server-side gambling math. For a mechanic: a server-side random process plus
    EV-neutral risk decisions by the player. For a game: a stated business model
    (house-banked with a fixed RTP, rake from player pots, or play money) and a server that
    decides every outcome.
-3. How engaging is it, according to the telemetry the bench records itself.
+3. How engaging is it, according to the telemetry the playground records itself.
 
 Context: a 48-hour hackathon prototype for a live-casino operator. We optimise for a live
 demo, not for production. Three engineers, no artists, no QA.
 
 ## What exists now
 
+One server app serves everything: the pages, the JSON API, the WebSocket and every game.
+
 ```
-apps/bench/                    React + Vite, the bench itself
-  games/<id>/                  one folder per game: manifest.json, index.html, main.ts, cover.svg
-  games/_template/             copied by yarn new-game; folders starting with "_" are not games
-  games.external.json          games hosted on another origin, base URLs of their manifest folders
-  src/localGames.ts            import.meta.glob over games/*/manifest.json: the folder tree is the registry
-  src/registry.ts              manifest → urls, typed error union, loading of external manifests
-  src/Gallery.tsx              game cards
-  src/Player.tsx               iframe, handshake, seed and relaunch, event log, JSON export
-  src/App.tsx  main.tsx  styles.css
-  src/*.test.ts                vitest, node environment; manifests.test.ts validates every game folder
-  vite.config.ts               every games/<id>/index.html is a build input of its own
-packages/protocol/             zod: manifest, registry, host↔game messages; parseWith → { ok, value } | { ok, reason }
+apps/web/                      @evo/web: the single server, http://localhost:5180
+  src/server/catalog.ts        scanGames(repo) → { games, errors }: the folder tree is the registry; catalogEntry(game) → urls
+  src/server/*.ts              Node http + ws; Vite middleware mode in dev, apps/web/dist in prod
+  pages/shell.html             EVO Playground pages: lobby, library grid, game page, stats, gamers board, add, my games; mock data inline
+  vite.config.ts               Vite root = repo root; every games/<id>/ page is a build input; outDir apps/web/dist; vitest over src
+  tsconfig.json                typechecks games/*/main.ts (DOM); tsconfig.server.json: src/server (Node, erasable syntax only)
+games/                         every game, one folder each; the folder tree is the registry
+  <id>/                        a game page: manifest.json, index.html, main.ts, cover (d20, sunset-break, warsaw-streets)
+  _template/                   copied by yarn new-game; folders starting with "_" are not games
+  alchemy-brawl/               a game with its own tables, still one folder: @evo/alchemy-brawl
+    manifest.json index.html cover.svg spec.md assets/   the page, the rules (v0.3), the SVG art
+    src/                       the client: React lobby + CSS HUD, Phaser table
+    engine/                    @evo/alchemy-brawl/engine: pure hand engine, scoring, per-seat view, zod protocol
+    tables/                    @evo/alchemy-brawl/tables: lobby, tables by code, timers, bots; mounted by apps/web on /ws
+packages/protocol/             zod: manifest, host↔game messages; parseWith → { ok, value } | { ok, reason }
 packages/rng/                  mulberry32 → { next, int, shuffle }; the only place Math.random may appear
-packages/game-sdk/             connect(onInit): game:ready → host:init → session { seed, sessionId, rng, emit }
-apps/alchemy-brawl/            a game with its own server: three workspaces in one folder
-  shared/                      @evo/brawl-shared: pure hand engine, scoring, per-seat view, zod protocol
-  server/                      @evo/brawl-server: Node + ws, lobby, tables, timers, bots; ws://localhost:5191/ws
-  client/                      @evo/brawl-client: Vite + React lobby and HUD, Phaser table; http://localhost:5190
+packages/game-sdk/             connect(onInit): game:ready → host:init → session { seed, sessionId, sandbox, rng, emit }
 scripts/new-game.mjs           yarn new-game <id> [Title]: copies the template, nothing else to register
 docs/passports/<id>.md         one passport per game, written before its code
 ```
 
-Target layout as code appears (do not create earlier than needed):
-
-```
-packages/engine    pure cores, zero dependencies, zero IO
-apps/server        round loop, ws, bet ledger
-apps/client        Phaser board, CSS HUD
-```
-
-A game that needs its own server and tables lives in one folder `apps/<id>/` with three
-workspaces, as `apps/alchemy-brawl/` does: `shared` (pure engine and the zod protocol, used by
-both sides), `server` and `client`. The root `workspaces` lists `apps/<id>/*`, and one root
-script runs client and server together. The server owns every hidden card and sends each seat
-only its own view; the client renders that view and the events. The client still opens from
-the bench gallery (list `http://localhost:<port>/` in `games.external.json` while it runs) and
-emits `round` through `@evo/game-sdk`, so the same telemetry covers it.
+A game that needs its own server and tables is still one folder `games/<id>/`, as
+`games/alchemy-brawl/` is: the page (`manifest.json`, `index.html`, `src/`), `spec.md`,
+`assets/`, plus `engine/` (pure engine and the zod protocol, used by both sides) and
+`tables/` (lobby, seats, timers, bots). The folder is one workspace package with two entry
+points, `@evo/<id>/engine` and `@evo/<id>/tables`. The tables have no process of their own:
+`apps/web` imports them and mounts them on `/ws`. The page opens from the library like any
+other game and still emits `round` through `@evo/game-sdk`, so the same telemetry covers it.
+The tables own every hidden card and send each seat only its own view; the client renders
+that view and the events. The root `workspaces` lists `games/*`; a plain game page has no
+`package.json` and is not a workspace.
 
 ## Commands
 
 ```
 yarn install
-yarn dev          # http://localhost:5180
+yarn dev          # http://localhost:5180, one process: pages, API, websocket, games via Vite middleware
+yarn start        # production: the same server serving apps/web/dist, after yarn build
 yarn typecheck    # tsc --noEmit
 yarn test         # vitest run
 yarn build
 yarn new-game <id> [Title words...]
-yarn brawl        # Alchemy Brawl: server and client together, http://localhost:5190
 ```
+
+## Routes
+
+All on one origin, http://localhost:5180:
+
+- Pages, a server-rendered `shell.html` with mock data and `window.EVO_CATALOG` (the list of
+  `catalogEntry`) injected as a script before the page's own scripts: `/`, `/library`,
+  `/game/:id`, `/game/:id/:tab`, `/stats`, `/stats/board`, `/add`, `/my`, `/ideas`.
+- JSON: `/api/games`, `/api/games/:id`, `/api/tables`; `POST /api/ideas` forwards an idea to the
+  Slack workflow webhook in `IDEAS_WEBHOOK_URL` (root `.env`, see `.env.example`; unset = 503).
+- Game pages: `/games/<id>/` (dev: Vite transforms them; prod: from `apps/web/dist`).
+- WebSocket: `/ws`, handled by the Alchemy Brawl `Lobby`.
+
+The game page opens in an iframe on the same origin; the shell plays the host side of the
+postMessage protocol. The Alchemy Brawl client connects to `ws(s)://location.host/ws` from
+inside that iframe.
 
 ## Game contract
 
-A game is a folder `apps/bench/games/<id>/` with `manifest.json`, `index.html`, `main.ts` and a
-cover. Nothing else is registered: the bench globs the folder tree, and `yarn test` fails on
-a manifest that does not parse, an `id` that differs from the folder name, a missing `entry`
+A game is a folder `games/<id>/` with `manifest.json`, `index.html`, `main.ts` (or `src/`
+for a game with its own tables) and a cover. Nothing else
+is registered: the server scans the folder tree (`catalog.ts`), and `yarn test` fails on a
+manifest that does not parse, an `id` that differs from the folder name, a missing `entry`
 or `cover`, or a duplicate id. Start a game with `yarn new-game <id>`; the template already
-speaks the protocol and emits `round`. A game may also live on another origin: list the base
-URL of its manifest folder in `apps/bench/games.external.json`; `entry` and `cover` resolve
-relative to `manifest.json`.
+speaks the protocol and emits `round`. Games on another origin are not supported: every game
+is served by this server.
 
-`main.ts` is strict TypeScript under the same rules as the bench. It gets the session from
+`main.ts` is strict TypeScript under the same rules as the server. It gets the session from
 `connect()` in `@evo/game-sdk` and randomness from `session.rng`; it never talks to
 `postMessage` or the PRNG directly.
 
@@ -108,7 +120,7 @@ the origin of `entry`; everything else goes to the log as `protocol error`. When
 the contract, bump `PROTOCOL_VERSION` and update `packages/protocol`, `packages/game-sdk`,
 the tests, README, the template and the d20 example in the same commit.
 
-## Rules for games on the bench
+## Rules for games on the playground
 
 - All randomness comes from the host `seed` through `session.rng`. One seed, one deal; the
   "Relaunch" button must reproduce the session. Without a host, `connect()` supplies seed 1
@@ -197,10 +209,12 @@ bonus features).
   compat patch does not understand the TS 7 package layout; the `tsc` binary resolves as usual.
 - The stack is pinned: React + Vite, zod, vitest, ws for the server, Phaser for the board
   (tweens, particles, camera shake and flash, sprite-sheet animations are built in).
-- Servers run TypeScript directly on Node's type stripping, with no build step. Relative
-  imports there and in the shared code they load carry the `.ts` extension, and only
+- Servers run TypeScript directly on Node's type stripping, with no build step: this covers
+  `apps/web/src/server`, `games/alchemy-brawl/tables` and the engine they load
+  (`games/alchemy-brawl/engine`). Relative imports there carry the `.ts` extension, and only
   erasable syntax is allowed (no enums, namespaces or parameter properties);
-  `erasableSyntaxOnly` enforces it.
+  `erasableSyntaxOnly` enforces it. Workspace imports use package names (`@evo/alchemy-brawl/engine`,
+  `@evo/protocol`, `@evo/rng`, `@evo/game-sdk`).
   Ask before adding any new dependency.
 - No `any`, no non-null assertions, no `as` except at parsing boundaries. `as const` does not
   count.
@@ -227,8 +241,8 @@ test is a build error.
 
 ## Telemetry and evaluation
 
-There is no "fun" metric. There are three layers, and the bench must supply raw material for
-all of them:
+There is no "fun" metric. There are three layers, and the playground must supply raw material
+for all of them:
 
 - From config, without people: hit rate, distribution of losing streaks, share of outcomes
   ≥5x/≥20x/≥100x, suspense/surprise curve (Ely, Frankel, Kamenica 2015), comparison of K bot
@@ -237,7 +251,7 @@ all of them:
 - Bots: scripted policies through the same `Decision` a human uses. In a game with
   skill, bots also measure the skill gradient: a stronger bot must beat a weaker one over
   many hands while the weaker one still wins single hands.
-- People, from bench logs: rounds until voluntary exit, latency of risk decisions, stake
+- People, from playground logs: rounds until voluntary exit, latency of risk decisions, stake
   dynamics after losses, tab focus loss, one question "want more?" on a 1–5 scale. Everyone
   gets the same set of seeds, comparison is relative only.
 
