@@ -169,10 +169,8 @@ export function createConnection(emit: Emit): Net {
 
   const open = (): void => {
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    // /ws standalone (own server, own origin); /phlebas-coop/ws when
-    // co-hosted behind apps/web — see build:embedded's .env.embedded.
-    const wsPath = import.meta.env.VITE_WS_PATH ?? '/ws';
-    const ws = new WebSocket(`${protocol}://${location.host}${wsPath}`);
+    // Its own path, not Alchemy Brawl's bare /ws — see app.ts's PHLEBAS_WS_PATH.
+    const ws = new WebSocket(`${protocol}://${location.host}/games/project-phlebas-coop/ws`);
     socket = ws;
     update({ status: 'connecting' });
     ws.addEventListener('open', () => {
