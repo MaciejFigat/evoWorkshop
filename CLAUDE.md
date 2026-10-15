@@ -40,11 +40,20 @@ apps/web/                      @evo/web: the single server, http://localhost:518
 games/                         every game, one folder each; the folder tree is the registry
   <id>/                        a game page: manifest.json, index.html, main.ts, cover (d20, sunset-break, warsaw-streets)
   _template/                   copied by yarn new-game; folders starting with "_" are not games
+  project-phlebas/             solo CS-history space shooter, feel experiment — see its passport
   alchemy-brawl/               a game with its own tables, still one folder: @evo/alchemy-brawl
     manifest.json index.html cover.svg spec.md assets/   the page, the rules (v0.3), the SVG art
     src/                       the client: React lobby + CSS HUD, Phaser table
     engine/                    @evo/alchemy-brawl/engine: pure hand engine, scoring, per-seat view, zod protocol
     tables/                    @evo/alchemy-brawl/tables: lobby, tables by code, timers, bots; mounted by apps/web on /ws
+  project-phlebas-coop/        2-player co-op port of games/project-phlebas, one folder: @evo/project-phlebas-coop
+    manifest.json index.html cover.svg src/   the page; host-relay netcode — the host's browser
+                                runs the actual simulation, the guest only renders and sends input (see its passport for why)
+    shared/                    @evo/project-phlebas-coop/shared: zod protocol — room/share-link
+                                messages plus Snapshot (positions, bullets, enemies, score, lives)
+    logic/                     @evo/project-phlebas-coop/logic: Lobby/Room, create/join rooms by a
+                                short code; mounted by apps/web on /games/project-phlebas-coop/ws
+                                (not bare /ws — see "Routes"), never runs the game itself
 packages/protocol/             zod: manifest, host↔game messages; parseWith → { ok, value } | { ok, reason }
 packages/rng/                  mulberry32 → { next, int, shuffle }; the only place Math.random may appear
 packages/game-sdk/             connect(onInit): game:ready → host:init → session { seed, sessionId, sandbox, rng, emit }
@@ -52,16 +61,32 @@ scripts/new-game.mjs           yarn new-game <id> [Title]: copies the template, 
 docs/passports/<id>.md         one passport per game, written before its code
 ```
 
-A game that needs its own server and tables is still one folder `games/<id>/`, as
-`games/alchemy-brawl/` is: the page (`manifest.json`, `index.html`, `src/`), `spec.md`,
-`assets/`, plus `engine/` (pure engine and the zod protocol, used by both sides) and
-`tables/` (lobby, seats, timers, bots). The folder is one workspace package with two entry
-points, `@evo/<id>/engine` and `@evo/<id>/tables`. The tables have no process of their own:
-`apps/web` imports them and mounts them on `/ws`. The page opens from the library like any
-other game and still emits `round` through `@evo/game-sdk`, so the same telemetry covers it.
-The tables own every hidden card and send each seat only its own view; the client renders
-that view and the events. The root `workspaces` lists `games/*`; a plain game page has no
-`package.json` and is not a workspace.
+A game that needs its own server-side state is still one folder `games/<id>/`, as
+`games/alchemy-brawl/` and `games/project-phlebas-coop/` are: the page (`manifest.json`,
+`index.html`, `src/`), plus one or two subfolders of pure server-side code — `engine`/`tables`
+for Alchemy Brawl's hand engine and lobby, `shared`/`logic` for Project Phlebas Co-op's zod
+protocol and relay lobby (name them for what they hold, not for a fixed pair). The folder is
+one workspace package with a subpath export per subfolder (`@evo/<id>/tables`,
+`@evo/project-phlebas-coop/logic`, and so on). The server-side folders have no process of
+their own: `apps/web` imports them and mounts their `Lobby` on a ws path — Alchemy Brawl's
+bare `/ws`, since it was first; any game added after it gets its own path instead
+(`/games/<id>/ws`; Project Phlebas Co-op uses `/games/project-phlebas-coop/ws` — see "Routes",
+and `app.ts`'s two `WebSocketServer({ noServer: true })` instances and its single `'upgrade'`
+dispatcher), so a second multiplayer game never has to share the first one's endpoint or
+protocol. The page opens from the library like any other game and still emits `round` through
+`@evo/game-sdk`, so the same telemetry covers it. The server-side code owns every hidden bit
+of state and sends each seat only its own view; the client renders that view and the events.
+The root `workspaces` lists `games/*`; a plain game page has no `package.json` and is not a
+workspace.
+
+**Important `ws` gotcha, if a third multiplayer game joins this list**: don't attach a second
+`WebSocketServer` the obvious way (`new WebSocketServer({ server: http, path })`, one per
+game) — confirmed with a minimal repro that two or more instances attached that way to the
+same `http.Server` corrupt each other's frames (`Invalid WebSocket frame: RSV1 must be clear`,
+or unexplained 400s), even though each is documented to filter by its own `path`. `app.ts`
+already uses the pattern that actually works (`noServer: true` + a shared `'upgrade'` listener
+that calls `handleUpgrade` on the matching instance only) for exactly this reason — copy that
+shape, not the simpler-looking one.
 
 ## Commands
 
@@ -85,11 +110,13 @@ All on one origin, http://localhost:5180:
 - JSON: `/api/games`, `/api/games/:id`, `/api/tables`; `POST /api/ideas` forwards an idea to the
   Slack workflow webhook in `IDEAS_WEBHOOK_URL` (root `.env`, see `.env.example`; unset = 503).
 - Game pages: `/games/<id>/` (dev: Vite transforms them; prod: from `apps/web/dist`).
-- WebSocket: `/ws`, handled by the Alchemy Brawl `Lobby`.
+- WebSocket: `/ws` for Alchemy Brawl's `Lobby`; `/games/project-phlebas-coop/ws` for Project
+  Phlebas Co-op's — each game's own path, not a shared one, so a second multiplayer game never
+  has to share the first one's endpoint or protocol.
 
 The game page opens in an iframe on the same origin; the shell plays the host side of the
-postMessage protocol. The Alchemy Brawl client connects to `ws(s)://location.host/ws` from
-inside that iframe.
+postMessage protocol. Each multiplayer game's client connects to its own
+`ws(s)://location.host/<its path>` from inside that iframe.
 
 ## Game contract
 
@@ -210,10 +237,11 @@ bonus features).
 - The stack is pinned: React + Vite, zod, vitest, ws for the server, Phaser for the board
   (tweens, particles, camera shake and flash, sprite-sheet animations are built in).
 - Servers run TypeScript directly on Node's type stripping, with no build step: this covers
-  `apps/web/src/server`, `games/alchemy-brawl/tables` and the engine they load
-  (`games/alchemy-brawl/engine`). Relative imports there carry the `.ts` extension, and only
-  erasable syntax is allowed (no enums, namespaces or parameter properties);
-  `erasableSyntaxOnly` enforces it. Workspace imports use package names (`@evo/alchemy-brawl/engine`,
+  `apps/web/src/server`, `games/alchemy-brawl/tables`, `games/project-phlebas-coop/logic` and
+  the pure code they load (`games/alchemy-brawl/engine`, `games/project-phlebas-coop/shared`).
+  Relative imports there carry the `.ts` extension, and only erasable syntax is allowed (no
+  enums, namespaces or parameter properties); `erasableSyntaxOnly` enforces it. Workspace
+  imports use package names (`@evo/alchemy-brawl/engine`, `@evo/project-phlebas-coop/shared`,
   `@evo/protocol`, `@evo/rng`, `@evo/game-sdk`).
   Ask before adding any new dependency.
 - No `any`, no non-null assertions, no `as` except at parsing boundaries. `as const` does not

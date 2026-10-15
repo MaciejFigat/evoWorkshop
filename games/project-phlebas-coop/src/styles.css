@@ -1,0 +1,305 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #101116;
+  color: #f1f2f5;
+}
+
+main {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.muted {
+  color: #8f93a2;
+  font: 12px ui-monospace, monospace;
+}
+
+.error {
+  color: #e9534d;
+}
+
+.name-form {
+  display: grid;
+  gap: 8px;
+}
+
+input {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #434757;
+  background: #1b1d25;
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 0;
+  background: #e9b949;
+  color: #1b1608;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.players .me {
+  color: #e9b949;
+}
+
+.players .open-slot {
+  color: #434757;
+  font-style: italic;
+}
+
+.round {
+  font: 13px ui-monospace, monospace;
+  color: #8f93a2;
+}
+
+.join-or-create {
+  display: grid;
+  gap: 16px;
+}
+
+.join-form {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input {
+  flex: 1;
+  text-transform: uppercase;
+}
+
+.share {
+  display: grid;
+  gap: 6px;
+}
+
+.room-code {
+  margin: 0;
+  font: 20px ui-monospace, monospace;
+  letter-spacing: 0.08em;
+}
+
+.room-code strong {
+  color: #e9b949;
+}
+
+.share-row {
+  display: flex;
+  gap: 8px;
+}
+
+.share-row input {
+  flex: 1;
+  font: 13px ui-monospace, monospace;
+}
+
+.room-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid #434757;
+  color: #f1f2f5;
+}
+
+/* --- Project Phlebas game view — ported from apps/bench/games/project-phlebas,
+   scoped under .phlebas so it coexists with the lobby styles above. --- */
+
+.phlebas {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+  background: #000;
+  color: #fff;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+.phlebas .hud-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #333;
+}
+
+.phlebas .hud-top .title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-right: auto;
+}
+
+.phlebas #status {
+  color: #888;
+  font: 11px ui-monospace, monospace;
+}
+
+.phlebas .layout {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  min-height: 0;
+}
+
+.phlebas .stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.phlebas .devpanel {
+  border-left: 1px solid #333;
+  padding: 16px 14px;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  font: 12px ui-monospace, monospace;
+}
+
+.phlebas .devpanel h2 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.phlebas .devpanel .group {
+  display: grid;
+  gap: 8px;
+}
+
+.phlebas .devpanel .label {
+  color: #888;
+}
+
+.phlebas .devpanel .btnrow {
+  display: flex;
+  gap: 6px;
+}
+
+.phlebas .devpanel button {
+  flex: 1;
+  font: inherit;
+  padding: 6px 4px;
+  background: transparent;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.phlebas .devpanel button.active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+.phlebas .devpanel button:hover:not(:disabled) {
+  border-color: #888;
+}
+
+.phlebas .devpanel label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.phlebas #board {
+  background: #000;
+  border: 1px solid #333;
+  image-rendering: pixelated;
+}
+
+.phlebas .overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgb(0 0 0 / 85%);
+  text-align: center;
+  padding: 24px;
+}
+
+.phlebas .overlay.visible {
+  display: grid;
+}
+
+.phlebas .overlay-card {
+  max-width: 360px;
+  border: 1px solid #fff;
+  padding: 20px 22px;
+}
+
+.phlebas .overlay-card h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.phlebas .overlay-card p {
+  margin: 0 0 8px;
+  color: #ccc;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.phlebas .overlay-card .hint {
+  margin-top: 14px;
+  color: #888;
+  font: 11px ui-monospace, monospace;
+}
+
+.phlebas .hud {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 16px;
+  border-top: 1px solid #333;
+  font: 12px ui-monospace, monospace;
+  color: #ccc;
+}
+
+.phlebas .hud b {
+  color: #fff;
+}
+
+.phlebas .hud .spacer {
+  margin-left: auto;
+  color: #666;
+}

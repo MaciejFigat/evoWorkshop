@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { DEFAULT_TABLE } from '@evo/alchemy-brawl/engine';
 import { Lobby } from '@evo/alchemy-brawl/tables';
+import { Lobby as PhlebasLobby } from '@evo/project-phlebas-coop/logic';
 import { createServer } from 'vite';
 import { createApp } from './app.ts';
 import { scanGames, type Catalog } from './catalog.ts';
@@ -25,6 +26,7 @@ const scanned: Catalog = scanGames(repo);
 const catalog = dev ? () => scanGames(repo) : () => scanned;
 
 const lobby = new Lobby(DEFAULT_TABLE);
+const phlebasLobby = new PhlebasLobby();
 
 // The http server exists before Vite so its HMR websocket can share the same listener.
 let frontend: Frontend = distFrontend(resolve(repo, 'apps/web/dist'));
@@ -37,6 +39,7 @@ const server = createApp({
     serveOther: (req, res) => frontend.serveOther(req, res),
   },
   lobby,
+  phlebasLobby,
   catalog,
   ideasWebhookUrl: process.env.IDEAS_WEBHOOK_URL,
 });

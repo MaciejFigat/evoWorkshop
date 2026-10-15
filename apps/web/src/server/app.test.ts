@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import type { LobbyTable } from '@evo/alchemy-brawl/engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { createApp, type Connection, type LobbyLike } from './app.ts';
+import { createApp, type Connection, type LobbyLike, type PhlebasConnection, type PhlebasLobbyLike } from './app.ts';
 import { scanGames, type CatalogEntry } from './catalog.ts';
 import { sendText } from './files.ts';
 import type { Frontend } from './frontend.ts';
@@ -37,6 +37,23 @@ function stubLobby(): StubLobby {
       disconnected.push(conn);
     },
     tables: () => TABLES,
+  };
+}
+
+type StubPhlebasLobby = PhlebasLobbyLike & { received: string[]; disconnected: PhlebasConnection[] };
+
+function stubPhlebasLobby(): StubPhlebasLobby {
+  const received: string[] = [];
+  const disconnected: PhlebasConnection[] = [];
+  return {
+    received,
+    disconnected,
+    receive: (_conn, raw) => {
+      received.push(raw);
+    },
+    disconnect: (conn) => {
+      disconnected.push(conn);
+    },
   };
 }
 
@@ -77,6 +94,7 @@ describe('createApp', () => {
   let dir = '';
   let base = '';
   let lobby: StubLobby;
+  let phlebasLobby: StubPhlebasLobby;
   let server: ReturnType<typeof createApp>;
   let hook: Webhook;
   let webhookUrl: string | undefined;
@@ -88,8 +106,18 @@ describe('createApp', () => {
     const shellFile = resolve(dir, 'shell.html');
     writeFileSync(shellFile, SHELL);
     lobby = stubLobby();
+    phlebasLobby = stubPhlebasLobby();
     const catalog = scanGames(repo);
-    server = createApp({ shellFile, cacheShell: true, hmr: false, frontend: stubFrontend, lobby, catalog: () => catalog, ideasWebhookUrl: webhookUrl });
+    server = createApp({
+      shellFile,
+      cacheShell: true,
+      hmr: false,
+      frontend: stubFrontend,
+      lobby,
+      phlebasLobby,
+      catalog: () => catalog,
+      ideasWebhookUrl: webhookUrl,
+    });
     await wait<void>((done) => server.listen(0, '127.0.0.1', done));
     const address: AddressInfo | string | null = server.address();
     if (address === null || typeof address === 'string') {
@@ -186,7 +214,13 @@ describe('createApp', () => {
     const idea = JSON.stringify({ title: 't', description: 'd', submittedBy: 'me' });
     const headers = { 'content-type': 'application/json' };
     const failing = createApp({
-      shellFile: resolve(dir, 'shell.html'), cacheShell: true, hmr: false, frontend: stubFrontend, lobby, catalog: () => scanGames(repo),
+      shellFile: resolve(dir, 'shell.html'),
+      cacheShell: true,
+      hmr: false,
+      frontend: stubFrontend,
+      lobby,
+      phlebasLobby,
+      catalog: () => scanGames(repo),
       ideasWebhookUrl: hook.url.replace('/hook', '/fail'),
     });
     await wait<void>((done) => failing.listen(0, '127.0.0.1', done));
@@ -197,7 +231,13 @@ describe('createApp', () => {
     await wait<void>((done) => failing.close(() => done()));
 
     const off = createApp({
-      shellFile: resolve(dir, 'shell.html'), cacheShell: true, hmr: false, frontend: stubFrontend, lobby, catalog: () => scanGames(repo),
+      shellFile: resolve(dir, 'shell.html'),
+      cacheShell: true,
+      hmr: false,
+      frontend: stubFrontend,
+      lobby,
+      phlebasLobby,
+      catalog: () => scanGames(repo),
       ideasWebhookUrl: undefined,
     });
     await wait<void>((done) => off.listen(0, '127.0.0.1', done));
@@ -264,6 +304,41 @@ describe('createApp', () => {
       poll();
     });
     expect(lobby.disconnected).toHaveLength(1);
+  });
+
+  it('routes /games/project-phlebas-coop/ws to the phlebas lobby only, independent of /ws', async () => {
+    const socket = new WebSocket(`${base.replace('http', 'ws')}/games/project-phlebas-coop/ws`);
+    await wait<void>((done, fail) => {
+      socket.once('open', done);
+      socket.once('error', fail);
+    });
+    const hello = '{"type":"hello","name":"Ada"}';
+    socket.send(hello);
+    await wait<void>((done) => {
+      const poll = (): void => {
+        if (phlebasLobby.received.length > 0) {
+          done();
+        } else {
+          setTimeout(poll, 5);
+        }
+      };
+      poll();
+    });
+    expect(phlebasLobby.received).toEqual([hello]);
+    expect(lobby.received).toEqual([]);
+    socket.close();
+    await wait<void>((done) => {
+      const poll = (): void => {
+        if (phlebasLobby.disconnected.length > 0) {
+          done();
+        } else {
+          setTimeout(poll, 5);
+        }
+      };
+      poll();
+    });
+    expect(phlebasLobby.disconnected).toHaveLength(1);
+    expect(lobby.disconnected).toEqual([]);
   });
 
   it('refuses an upgrade on another path without touching the lobby', async () => {
