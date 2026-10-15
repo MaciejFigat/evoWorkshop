@@ -72,6 +72,7 @@
       this.score = 0;
       this.lives = 3;
       this.startStage(0);
+      WS.Audio.start();
     }
 
     // One run = one round for the playground telemetry: reported once, when it ends.
