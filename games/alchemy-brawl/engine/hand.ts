@@ -1,6 +1,6 @@
 import { sameCard, type Card } from './cards.ts';
 import { MIN_PLAYERS, round1Pot, type Rules } from './config.ts';
-import { bestCombination, bestOfCards, winnersOf } from './scoring.ts';
+import { bestFive, round1Combination, winnersOf } from './scoring.ts';
 import type {
   BetAction,
   BetOptions,
@@ -225,7 +225,7 @@ function resolveRound1(state: HandState, events: HandEvent[]): void {
   } else {
     const combinations = shown.map((entry) => ({
       seat: entry.seat,
-      combination: bestCombination(entry.card, state.table),
+      combination: round1Combination(entry.card, state.table),
     }));
     const winners = winnersOf(combinations);
     result = { ...base, combinations, winners, payouts: payOut(state, pot, winners), rolledOver: false };
@@ -362,7 +362,7 @@ function advance(state: HandState, events: HandEvent[]): StepError | null {
   return 'wrong_phase';
 }
 
-// Every remaining hand is shown whole; the combination is the best three among hand and table.
+// Every remaining hand is shown whole; the combination is the best five among hand and table.
 // Each pot goes to the best combination among the seats eligible for it.
 function showdown(state: HandState, events: HandEvent[]): void {
   const hands: SeatCards[] = [];
@@ -372,7 +372,7 @@ function showdown(state: HandState, events: HandEvent[]): void {
     }
   });
   const combinations: SeatCombination[] = hands.flatMap((entry) => {
-    const combination = bestOfCards([...entry.cards, ...state.table]);
+    const combination = bestFive([...entry.cards, ...state.table]);
     return combination === null ? [] : [{ seat: entry.seat, combination }];
   });
   const pots = buildPots(state).map((pot) => ({

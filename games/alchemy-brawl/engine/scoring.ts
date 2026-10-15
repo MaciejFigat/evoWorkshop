@@ -1,8 +1,8 @@
 import type { Card } from './cards.ts';
-import type { Category, Combination, SeatCombination } from './types.ts';
+import type { Category, Combination, SeatCombination, ThreeCardCategory } from './types.ts';
 
-// Index of each category in CATEGORIES: the first entry of a combination key.
-export const CATEGORY_RANK: Record<Category, number> = {
+// Index of each category in THREE_CARD_CATEGORIES: the first entry of a Round 1 combination key.
+export const THREE_CARD_RANK: Record<ThreeCardCategory, number> = {
   high: 0,
   pair: 1,
   flush: 2,
@@ -11,74 +11,145 @@ export const CATEGORY_RANK: Record<Category, number> = {
   straightFlush: 5,
 };
 
-function make(category: Category, cards: Card[], tiebreak: number[]): Combination {
-  return { category, cards, key: [CATEGORY_RANK[category], ...tiebreak] };
+// Index of each category in CATEGORIES: the first entry of a Final combination key.
+export const FIVE_CARD_RANK: Record<Category, number> = {
+  high: 0,
+  pair: 1,
+  twoPair: 2,
+  three: 3,
+  straight: 4,
+  flush: 5,
+  fullHouse: 6,
+  four: 7,
+  straightFlush: 8,
+};
+
+function makeThree(category: ThreeCardCategory, cards: Card[], tiebreak: number[]): Combination {
+  return { category, cards, key: [THREE_CARD_RANK[category], ...tiebreak] };
 }
 
-// Three-card poker (spec §5). Powers 1..13 with no wrap; elements have no order.
+function makeFive(category: Category, cards: Card[], tiebreak: number[]): Combination {
+  return { category, cards, key: [FIVE_CARD_RANK[category], ...tiebreak] };
+}
+
+// Three-card poker (spec §5.1). Powers 1..13 with no wrap; elements have no order.
 export function rankThree(a: Card, b: Card, c: Card): Combination {
   const cards = [a, b, c];
   const [p0 = 0, p1 = 0, p2 = 0] = [a.power, b.power, c.power].sort((x, y) => y - x);
   const flush = a.element === b.element && b.element === c.element;
   const straight = p0 === p1 + 1 && p1 === p2 + 1;
   if (straight && flush) {
-    return make('straightFlush', cards, [p0]);
+    return makeThree('straightFlush', cards, [p0]);
   }
   if (p0 === p1 && p1 === p2) {
-    return make('three', cards, [p0]);
+    return makeThree('three', cards, [p0]);
   }
   if (straight) {
-    return make('straight', cards, [p0]);
+    return makeThree('straight', cards, [p0]);
   }
   if (flush) {
-    return make('flush', cards, [p0, p1, p2]);
+    return makeThree('flush', cards, [p0, p1, p2]);
   }
   if (p0 === p1) {
-    return make('pair', cards, [p0, p2]);
+    return makeThree('pair', cards, [p0, p2]);
   }
   if (p1 === p2) {
-    return make('pair', cards, [p1, p0]);
+    return makeThree('pair', cards, [p1, p0]);
   }
-  return make('high', cards, [p0, p1, p2]);
+  return makeThree('high', cards, [p0, p1, p2]);
 }
 
-// Round 1: the shown card with the two table cards (the best two, if more are given). The shown card comes first.
-export function bestCombination(shown: Card, table: Card[]): Combination {
-  let best: Combination | null = null;
-  for (let i = 0; i < table.length; i += 1) {
-    for (let j = i + 1; j < table.length; j += 1) {
-      const first = table[i];
-      const second = table[j];
-      if (first === undefined || second === undefined) {
-        continue;
-      }
-      const candidate = rankThree(shown, first, second);
-      if (best === null || compareCombinations(candidate, best) > 0) {
-        best = candidate;
-      }
-    }
+type Group = { power: number; count: number };
+
+// Five-card poker (spec §5.2). Powers 1..13 with no wrap, 1 always low; elements have no order.
+export function rankFive(a: Card, b: Card, c: Card, d: Card, e: Card): Combination {
+  const input = [a, b, c, d, e];
+  const byPower = [...input].sort((x, y) => y.power - x.power);
+  const powers = byPower.map((card) => card.power);
+  const flush = input.every((card) => card.element === a.element);
+
+  const counts = new Map<number, number>();
+  for (const card of input) {
+    counts.set(card.power, (counts.get(card.power) ?? 0) + 1);
   }
-  return best ?? make('high', [shown], [shown.power]);
+  // Larger groups first, then higher power: the group powers in this order are exactly the tiebreak.
+  const groups: Group[] = [...counts.entries()]
+    .map(([power, count]) => ({ power, count }))
+    .sort((x, y) => y.count - x.count || y.power - x.power);
+  const groupPowers = groups.map((group) => group.power);
+  const grouped = groups.flatMap((group) => byPower.filter((card) => card.power === group.power));
+  const first = groups[0]?.count ?? 0;
+  const second = groups[1]?.count ?? 0;
+
+  const high = powers[0] ?? 0;
+  const low = powers[4] ?? 0;
+  const straight = groups.length === 5 && high - low === 4;
+
+  if (straight && flush) {
+    return makeFive('straightFlush', byPower, [high]);
+  }
+  if (first === 4) {
+    return makeFive('four', grouped, groupPowers);
+  }
+  if (first === 3 && second === 2) {
+    return makeFive('fullHouse', grouped, groupPowers);
+  }
+  if (flush) {
+    return makeFive('flush', byPower, powers);
+  }
+  if (straight) {
+    return makeFive('straight', byPower, [high]);
+  }
+  if (first === 3) {
+    return makeFive('three', grouped, groupPowers);
+  }
+  if (first === 2 && second === 2) {
+    return makeFive('twoPair', grouped, groupPowers);
+  }
+  if (first === 2) {
+    return makeFive('pair', grouped, groupPowers);
+  }
+  return makeFive('high', byPower, powers);
 }
 
-// The Final: the best three cards among everything the player can use, hand and table together,
-// so the board alone may play. Null with fewer than three cards. The three cards come out highest
-// power first, so the text helpers read the way the spec writes combinations (10-6-5).
-export function bestOfCards(cards: Card[]): Combination | null {
-  const sorted = [...cards].sort((x, y) => y.power - x.power);
+// Round 1: the shown card with the two table cards, shown card first. With fewer than two table cards
+// (never in play) it falls back to a high card of the cards given.
+export function round1Combination(shown: Card, table: Card[]): Combination {
+  const [first, second] = table;
+  if (first === undefined || second === undefined) {
+    const cards = [shown, ...table];
+    return makeThree(
+      'high',
+      cards,
+      cards.map((card) => card.power).sort((x, y) => y - x),
+    );
+  }
+  return rankThree(shown, first, second);
+}
+
+// The Final: the best five cards among everything the player can use, hand and table together
+// (C(7,5) = 21 subsets in play). Null with fewer than five cards.
+export function bestFive(cards: Card[]): Combination | null {
   let best: Combination | null = null;
-  for (let i = 0; i < sorted.length; i += 1) {
-    for (let j = i + 1; j < sorted.length; j += 1) {
-      for (let k = j + 1; k < sorted.length; k += 1) {
-        const first = sorted[i];
-        const second = sorted[j];
-        const third = sorted[k];
-        if (first === undefined || second === undefined || third === undefined) {
-          continue;
-        }
-        const candidate = rankThree(first, second, third);
-        if (best === null || compareCombinations(candidate, best) > 0) {
-          best = candidate;
+  const n = cards.length;
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      for (let k = j + 1; k < n; k += 1) {
+        for (let l = k + 1; l < n; l += 1) {
+          for (let m = l + 1; m < n; m += 1) {
+            const a = cards[i];
+            const b = cards[j];
+            const c = cards[k];
+            const d = cards[l];
+            const e = cards[m];
+            if (a === undefined || b === undefined || c === undefined || d === undefined || e === undefined) {
+              continue;
+            }
+            const candidate = rankFive(a, b, c, d, e);
+            if (best === null || compareCombinations(candidate, best) > 0) {
+              best = candidate;
+            }
+          }
         }
       }
     }

@@ -52,7 +52,7 @@ function appendixDeck() {
     [BORIS, VERA, GLEB, ANA],
     [cards('7F 12E 13A'), cards('3E 10F 12W'), cards('6W 13E 9A'), cards('2F 11A 5W')],
     cards('10A 11E'),
-    [cards('1W'), cards('5F'), cards('7W'), cards('8W')],
+    [cards('9F'), cards('12F'), cards('7W'), cards('8W')],
     cards('10W'),
   );
 }
@@ -115,8 +115,8 @@ describe('a full hand (spec appendix)', () => {
     expect(state.phase).toBe('bet');
     expect(state.table).toEqual(cards('10A 11E 10W'));
     expect(state.players.map((p) => p.hand)).toEqual([
-      cards('7F 12E 13A 1W'),
-      cards('3E 10F 12W 5F'),
+      cards('7F 12E 13A 9F'),
+      cards('3E 10F 12W 12F'),
       cards('6W 13E 9A 7W'),
       cards('2F 11A 5W 8W'),
     ]);
@@ -137,12 +137,12 @@ describe('a full hand (spec appendix)', () => {
       payouts: [0, 268, 0, 0],
     });
     expect(done.final?.hands).toEqual([
-      { seat: ANA, cards: cards('7F 12E 13A 1W') },
-      { seat: BORIS, cards: cards('3E 10F 12W 5F') },
+      { seat: ANA, cards: cards('7F 12E 13A 9F') },
+      { seat: BORIS, cards: cards('3E 10F 12W 12F') },
     ]);
     expect(done.final?.combinations).toEqual([
-      { seat: ANA, combination: { category: 'straight', cards: cards('13A 12E 11E'), key: [3, 13] } },
-      { seat: BORIS, combination: { category: 'three', cards: cards('10F 10A 10W'), key: [4, 10] } },
+      { seat: ANA, combination: { category: 'straight', cards: cards('13A 12E 11E 10A 9F'), key: [4, 13] } },
+      { seat: BORIS, combination: { category: 'fullHouse', cards: cards('10F 10A 10W 12W 12F'), key: [6, 10, 12] } },
     ]);
     expect(done.players.map((p) => p.stack - STACK)).toEqual([-100, 168, -28, -40]);
     expect(done.finalPot).toBe(0);
@@ -346,24 +346,27 @@ describe('step', () => {
     expect(events.map((e) => e.type)).toEqual(['betPlaced', 'handEnded']);
   });
 
-  it('shows every remaining hand at the showdown and lets the board play', () => {
+  it('shows every remaining hand at the showdown and splits a shared best five', () => {
+    // Every seat holds an 8 and a 9 over a 5-6-7 table: three equal 9-high straights, each with its own cards.
     const deck = stackedDeck(
       [1, 2, 0],
-      [cards('1W 2A 9E'), cards('4W 8A 13E'), cards('1A 3W 10E')],
-      cards('5F 6F'),
-      [cards('2E'), cards('6E'), cards('7A')],
-      cards('7F'),
+      [cards('8A 9A 1W'), cards('8W 9E 13E'), cards('8E 9W 1A')],
+      cards('5F 6W'),
+      [cards('2E'), cards('3A'), cards('12W')],
+      cards('7E'),
     );
     const start = ok(startHand(DEFAULT_RULES, seats(3), 0, deck)).state;
     const state = play(start, [skip(0), skip(1), skip(2), advance, check(1), check(2), check(0), advance]);
     expect(state.final?.hands).toEqual([
-      { seat: 0, cards: cards('1W 2A 9E 2E') },
-      { seat: 1, cards: cards('4W 8A 13E 6E') },
-      { seat: 2, cards: cards('1A 3W 10E 7A') },
+      { seat: 0, cards: cards('8A 9A 1W 2E') },
+      { seat: 1, cards: cards('8W 9E 13E 3A') },
+      { seat: 2, cards: cards('8E 9W 1A 12W') },
     ]);
-    for (const entry of state.final?.combinations ?? []) {
-      expect(entry.combination).toEqual({ category: 'straightFlush', cards: cards('7F 6F 5F'), key: [5, 7] });
-    }
+    expect(state.final?.combinations).toEqual([
+      { seat: 0, combination: { category: 'straight', cards: cards('9A 8A 7E 6W 5F'), key: [4, 9] } },
+      { seat: 1, combination: { category: 'straight', cards: cards('9E 8W 7E 6W 5F'), key: [4, 9] } },
+      { seat: 2, combination: { category: 'straight', cards: cards('9W 8E 7E 6W 5F'), key: [4, 9] } },
+    ]);
     expect(state.final?.pots).toEqual([{ amount: 30, eligible: [0, 1, 2], winners: [0, 1, 2] }]);
     expect(state.final?.winners).toEqual([0, 1, 2]);
     expect(state.final?.payouts).toEqual([10, 10, 10]);
@@ -375,7 +378,7 @@ describe('step', () => {
       [cards('5A 1F 2W'), cards('5W 1A 2F'), cards('5E 1W 2A')],
       cards('10A 11E'),
       [cards('3F'), cards('3W'), cards('4E')],
-      cards('13F'),
+      cards('4F'),
     );
     const start = ok(startHand(DEFAULT_RULES, seats(3), 0, deck)).state;
     expect(start.round1Pot).toBe(9);
@@ -389,21 +392,22 @@ describe('step', () => {
     expect(state.round1?.payouts).toEqual([3, 3, 3]);
 
     const done = play(state, [advance, check(1), check(2), check(0), advance]);
-    expect(done.final?.combinations.map((c) => c.combination.category)).toEqual(['straight', 'straight', 'flush']);
+    // Seats 0 and 1 hold 1-2-3 over 4-5 on the table: the lowest straight; seat 2 holds a pair of 4s.
+    expect(done.final?.combinations.map((c) => c.combination.key)).toEqual([[4, 5], [4, 5], [1, 4, 11, 10, 5]]);
     expect(done.final?.winners).toEqual([0, 1]);
     expect(done.final?.pot).toBe(21);
     expect(done.final?.payouts).toEqual([10, 11, 0]);
   });
 
   describe('side pots at stacks 50 / 200 / 1000', () => {
-    // Button 0. Seat 1 (50) holds three 10s, seat 2 (200) a 13-high straight, seat 0 (1000) a 6-high straight.
+    // Button 0. Seat 1 (50) holds a full house, seat 2 (200) a 13-high straight, seat 0 (1000) a pair of 4s.
     function start(): HandState {
       const deck = stackedDeck(
         [1, 2, 0],
-        [cards('3F 4W 11A'), cards('10F 10W 1A'), cards('12W 13E 2F')],
+        [cards('3F 4W 4E'), cards('10F 10W 11A'), cards('12W 13E 2F')],
         cards('10A 11E'),
         [cards('6E'), cards('7E'), cards('8E')],
-        cards('5A'),
+        cards('9A'),
       );
       const stakes = [
         { id: 'big', stack: 1000 },
@@ -426,9 +430,9 @@ describe('step', () => {
 
       const done = play(state, [advance]);
       expect(done.final?.combinations).toEqual([
-        { seat: 0, combination: { category: 'straight', cards: cards('6E 5A 4W'), key: [3, 6] } },
-        { seat: 1, combination: { category: 'three', cards: cards('10F 10W 10A'), key: [4, 10] } },
-        { seat: 2, combination: { category: 'straight', cards: cards('13E 12W 11E'), key: [3, 13] } },
+        { seat: 0, combination: { category: 'pair', cards: cards('4W 4E 11E 10A 9A'), key: [1, 4, 11, 10, 9] } },
+        { seat: 1, combination: { category: 'fullHouse', cards: cards('10F 10W 10A 11A 11E'), key: [6, 10, 11] } },
+        { seat: 2, combination: { category: 'straight', cards: cards('13E 12W 11E 10A 9A'), key: [4, 13] } },
       ]);
       expect(done.final?.pots).toEqual([
         { amount: 150, eligible: [0, 1, 2], winners: [1] },
@@ -547,13 +551,13 @@ describe('viewFor', () => {
   it('gives each seat its own best in the Final and bet options to the actor only', () => {
     const state = play(appendix(), [...ROUND1, advance]);
     const ana = viewFor(state, ANA);
-    expect(ana.you?.hand).toEqual(cards('7F 12E 13A 1W'));
+    expect(ana.you?.hand).toEqual(cards('7F 12E 13A 9F'));
     expect(ana.you?.options).toEqual([]);
-    expect(ana.you?.best).toEqual({ category: 'straight', cards: cards('13A 12E 11E'), key: [3, 13] });
+    expect(ana.you?.best).toEqual({ category: 'straight', cards: cards('13A 12E 11E 10A 9F'), key: [4, 13] });
     expect(ana.you?.bet).toBeNull();
     expect(ana.betting).toEqual({ level: 0, minRaise: 30, actor: BORIS });
     expect(viewFor(state, BORIS).you?.bet).toEqual({ canCheck: true, call: 0, callAllIn: false, raise: { min: 30, max: 990 } });
-    expect(viewFor(state, BORIS).you?.best).toMatchObject({ category: 'three', key: [4, 10] });
+    expect(viewFor(state, BORIS).you?.best).toMatchObject({ category: 'fullHouse', key: [6, 10, 12] });
     expect(JSON.stringify(ana)).not.toContain(JSON.stringify(card('10F')));
   });
 
@@ -572,14 +576,14 @@ describe('viewFor', () => {
     const state = play(appendix(), [...ROUND1, advance, ...FINAL_BETS]);
     const vera = viewFor(state, VERA);
     expect(vera.players[VERA]?.folded).toBe(true);
-    expect(vera.you?.best).toMatchObject({ category: 'straight', cards: cards('11E 10A 9A'), key: [3, 11] });
+    expect(vera.you?.best).toEqual({ category: 'pair', cards: cards('10A 10W 13E 11E 9A'), key: [1, 10, 13, 11, 9] });
     expect(vera.betting).toBeNull();
     expect(JSON.stringify(vera)).not.toContain(JSON.stringify(card('10F')));
 
     const done = play(state, [advance]);
     const view = viewFor(done, VERA);
     expect(view.final?.hands.map((h) => h.seat)).toEqual([ANA, BORIS]);
-    expect(view.final?.hands[1]?.cards).toEqual(cards('3E 10F 12W 5F'));
+    expect(view.final?.hands[1]?.cards).toEqual(cards('3E 10F 12W 12F'));
     expect(view.you?.hand).toEqual(cards('6W 13E 9A 7W'));
     expect(view.players.map((p) => p.handCount)).toEqual([4, 4, 4, 4]);
     expect(JSON.stringify({ ...view, final: null })).not.toContain(JSON.stringify(card('10F')));

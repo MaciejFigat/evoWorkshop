@@ -69,7 +69,7 @@ export function App({ net }: { net: Net }) {
           <>
             <div className="panel hands">
               <h3>Hands</h3>
-              <CombinationTable active={hand === null ? null : activeCombination(hand, picked)} />
+              <CombinationTable phase={hand?.phase ?? null} active={hand === null ? null : activeCombination(hand, picked)} />
             </div>
             <History entries={state.history} />
           </>

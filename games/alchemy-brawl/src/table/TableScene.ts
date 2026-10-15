@@ -168,7 +168,8 @@ export class TableScene extends Phaser.Scene {
     return hand.phase === 'done' ? (hand.final?.winners ?? []) : [];
   }
 
-  // The three cards of a winning combination, per winner, so they can be highlighted wherever they lie.
+  // The cards of a winning combination (three in Round 1, five in the Final), per winner, so they can be
+  // highlighted wherever they lie.
   // A lone Round 1 stayer wins without a contest and has no combination to highlight.
   private winningCards(hand: HandView, seat: number): Card[] {
     if (!this.winners(hand).includes(seat)) {

@@ -1,4 +1,4 @@
-import { bestCombination, bestOfCards, type BetOptions, type Card, type HandView } from '@evo/alchemy-brawl/engine';
+import { bestFive, round1Combination, type BetOptions, type Card, type HandView } from '@evo/alchemy-brawl/engine';
 import { mulberry32 } from '@evo/rng';
 import { describe, expect, it } from 'vitest';
 import { chooseBotMove, type BotMove } from './bot.ts';
@@ -21,7 +21,7 @@ type Setup = {
 
 const STACK = 990;
 
-// Builds the view the engine would publish: Round 1 show options in 'decide', the best three among
+// Builds the view the engine would publish: Round 1 show options in 'decide', the best five among
 // hand and table plus the betting options once the Final is on.
 function view(setup: Setup): HandView {
   const inFinal = setup.phase === 'bet' || setup.phase === 'reveal' || setup.phase === 'done';
@@ -56,8 +56,8 @@ function view(setup: Setup): HandView {
       decision: null,
       canDecide: setup.canDecide ?? false,
       bet: setup.bet ?? null,
-      options: setup.phase === 'decide' ? setup.hand.map((card) => ({ card, combination: bestCombination(card, setup.table) })) : [],
-      best: inFinal ? bestOfCards([...setup.hand, ...setup.table]) : null,
+      options: setup.phase === 'decide' ? setup.hand.map((card) => ({ card, combination: round1Combination(card, setup.table) })) : [],
+      best: inFinal ? bestFive([...setup.hand, ...setup.table]) : null,
     },
   };
 }
@@ -81,9 +81,14 @@ const unopened: Setup = {
   bet: { canCheck: true, call: 0, callAllIn: false, raise: { min: 30, max: STACK } },
 };
 
-const STRAIGHT = [e(7), w(9), f(13)];
+// Final hands against the table f(5), w(6), e(9): a 5-6-7-8-9 straight, three 5s with 13-9 kickers,
+// two pair 6s and 5s with a 13, a pair of 5s with 13-11-9 kickers, and a 13 high with no pair,
+// straight or flush among the seven cards.
+const STRAIGHT = [e(7), a(8), w(13), a(2)];
+const THREE = [e(5), a(5), w(13), a(2)];
+const TWO_PAIR = [e(5), a(6), w(13), a(2)];
 const PAIR = [e(5), a(2), a(13), w(11)];
-const HIGH = [w(2), f(13), e(3)];
+const HIGH = [w(2), f(13), e(3), a(11)];
 
 function sample(setup: Setup, n = 200): BotMove[] {
   return Array.from({ length: n }, (_, seed) => chooseBotMove(view(setup), mulberry32(seed + 1))).flatMap((m) => (m === null ? [] : [m]));
@@ -124,6 +129,23 @@ describe('chooseBotMove', () => {
   it('raises a straight by the size of the pot', () => {
     const move = chooseBotMove(view({ ...facingBet(), hand: STRAIGHT }), mulberry32(1));
     expect(move).toEqual({ type: 'bet', action: { kind: 'raise', to: 30 + 81 } });
+  });
+
+  it('raises three of a kind by the size of the pot, the weakest strong hand', () => {
+    const move = chooseBotMove(view({ ...facingBet(), hand: THREE }), mulberry32(1));
+    expect(move).toEqual({ type: 'bet', action: { kind: 'raise', to: 30 + 81 } });
+  });
+
+  it('plays two pair as a medium hand: the minimum raise now and then, otherwise a call', () => {
+    const outcomes = sample({ ...facingBet(), hand: TWO_PAIR });
+    const raises = outcomes.filter((m) => m.type === 'bet' && m.action.kind === 'raise');
+    const calls = kinds(outcomes, 'call');
+    expect(raises.length + calls).toBe(200);
+    expect(raises.length).toBeGreaterThan(30);
+    expect(calls).toBeGreaterThan(100);
+    for (const raise of raises) {
+      expect(raise).toEqual({ type: 'bet', action: { kind: 'raise', to: 60 } });
+    }
   });
 
   it('opens a straight for the minimum when the pot is smaller than the minimum bet', () => {
@@ -194,7 +216,7 @@ describe('chooseBotMove', () => {
       pot: 500,
       bet: { canCheck: false, call: 30, callAllIn: false, raise: { min: 45, max: 45 } },
     });
-    for (const hand of [STRAIGHT, PAIR, HIGH]) {
+    for (const hand of [STRAIGHT, THREE, TWO_PAIR, PAIR, HIGH]) {
       for (const move of sample(short(hand), 100)) {
         if (move.type === 'bet' && move.action.kind === 'raise') {
           expect(move.action.to).toBeLessThanOrEqual(45);

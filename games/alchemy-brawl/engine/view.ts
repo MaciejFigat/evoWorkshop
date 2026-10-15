@@ -1,5 +1,5 @@
 import { betOptions } from './hand.ts';
-import { bestCombination, bestOfCards } from './scoring.ts';
+import { bestFive, round1Combination } from './scoring.ts';
 import type { CardOption, HandState, HandView, PlayerView, YouView } from './types.ts';
 
 export function viewFor(state: HandState, seat: number | null): HandView {
@@ -45,7 +45,7 @@ function youFor(state: HandState, seat: number): YouView | null {
   }
   const inFinal = state.phase === 'bet' || state.phase === 'reveal' || state.phase === 'done';
   const options: CardOption[] =
-    state.phase === 'decide' ? player.hand.map((card) => ({ card, combination: bestCombination(card, state.table) })) : [];
+    state.phase === 'decide' ? player.hand.map((card) => ({ card, combination: round1Combination(card, state.table) })) : [];
   return {
     seat,
     hand: [...player.hand],
@@ -54,6 +54,6 @@ function youFor(state: HandState, seat: number): YouView | null {
     bet: betOptions(state, seat),
     options,
     // A folded player still sees their own best: it is their own cards plus public ones.
-    best: inFinal ? bestOfCards([...player.hand, ...state.table]) : null,
+    best: inFinal ? bestFive([...player.hand, ...state.table]) : null,
   };
 }

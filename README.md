@@ -60,7 +60,7 @@ postMessage protocol below.
 
 Open http://localhost:5180, pick Alchemy Brawl in the library, enter a name, create a table
 or join one by its code, and add bots to fill the seats. Each browser tab is a separate
-player, and a reload keeps the seat. Rules: `games/alchemy-brawl/spec.md` (v0.6); passport:
+player, and a reload keeps the seat. Rules: `games/alchemy-brawl/spec.md` (v0.7); passport:
 `docs/passports/alchemy-brawl.md`.
 
 The rules in five lines:
@@ -78,9 +78,12 @@ The rules in five lines:
    of 30; a raise must be at least the size of the last raise, and going all-in for the
    whole stack is always allowed. All your cards play. The last player standing, or the best
    combination at the showdown, takes 70% of the antes plus all bets.
-5. In Round 1 a combination is your shown card plus the two table cards; in the Final it is
-   the best three cards among your whole hand and the three table cards. Both rank as a
-   three-card poker hand: straight flush, three of a kind, straight, flush, pair, high card.
+5. Each round has its own ranking. In Round 1 a combination is your shown card plus the two
+   table cards, ranked as a three-card poker hand: straight flush, three of a kind, straight,
+   flush, pair, high card. In the Final it is the best five cards among your whole hand and
+   the three table cards, ranked as a normal poker hand: straight flush, four of a kind, full
+   house, flush, straight, three of a kind, two pair, pair, high card. The straight and the
+   flush swap places between the rounds. 1 is always low: 10-11-12-13-1 is not a straight.
    Equal combinations split the pot. Nobody ever discards a card.
 
 Tables seat 3 to 11 players, 6 by default. The prototype plays play money; a stack below
