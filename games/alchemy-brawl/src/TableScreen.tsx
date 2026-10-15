@@ -1,7 +1,8 @@
 import type { TableView } from '@evo/alchemy-brawl/engine';
 import { useEffect, useState } from 'react';
 import { ActionDock } from './ActionDock';
-import type { Net, NetState } from './net';
+import { ChatPopover } from './ChatPopover';
+import type { ChatLine, Net, NetState } from './net';
 import { RoundStrip } from './RoundStrip';
 import { Rules } from './Rules';
 import { selection } from './selection';
@@ -13,12 +14,16 @@ export function TableScreen({
   seq,
   receivedAt,
   status,
+  chat,
+  playerId,
 }: {
   net: Net;
   table: TableView;
   seq: number;
   receivedAt: number;
   status: NetState['status'];
+  chat: ChatLine[];
+  playerId: string | null;
 }) {
   const [showRules, setShowRules] = useState(false);
   const hand = table.hand;
@@ -38,13 +43,13 @@ export function TableScreen({
         </span>
         <span className={`dot ${status}`} title={status} />
         <span className="spacer" />
-        <button type="button" onClick={() => setShowRules((open) => !open)}>
+        <button type="button" className="nav-pill" onClick={() => setShowRules((open) => !open)}>
           Rules
         </button>
-        <button type="button" disabled={table.seats.length >= table.maxPlayers} onClick={() => net.send({ type: 'addBot' })}>
+        <button type="button" className="nav-pill" disabled={table.seats.length >= table.maxPlayers} onClick={() => net.send({ type: 'addBot' })}>
           Add bot
         </button>
-        <button type="button" onClick={() => net.send({ type: 'leave' })}>
+        <button type="button" className="nav-pill" onClick={() => net.send({ type: 'leave' })}>
           Leave
         </button>
       </header>
@@ -53,6 +58,7 @@ export function TableScreen({
         <RoundStrip hand={hand} timeLeftMs={table.timeLeftMs} receivedAt={receivedAt} />
         <div className="stage">
           <PhaserTable net={net} />
+          <ChatPopover net={net} lines={chat} playerId={playerId} />
           {showRules && (
             <div className="overlay" onClick={() => setShowRules(false)}>
               <div className="panel" onClick={(e) => e.stopPropagation()}>

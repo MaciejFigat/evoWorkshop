@@ -29,12 +29,12 @@ body {
   font: 14px/1.4 Georgia, serif;
 }
 
-/* The page runs inside the playground's iframe: a poker-room shell fills the viewport. Side panels
-   left and right, the centre column holds a slim top row, the board and the fixed control bar, so the
-   board takes everything the fixed rows leave and never resizes between phases. */
+/* The page runs inside the playground's iframe: a poker-room shell fills the viewport. The centre
+   column holds a slim top row, the board and the fixed control bar, so the board takes everything the
+   fixed rows leave and never resizes between phases; the hint ladder and the history sit on the right. */
 .shell {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) 250px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 10px;
   height: 100%;
   padding: 10px;
@@ -158,7 +158,8 @@ code {
   letter-spacing: 2px;
 }
 
-/* ---- top row: one line, nothing wraps ---- */
+/* ---- top row: one line, nothing wraps. The table buttons are the chat button's glass pill at half
+   its height. ---- */
 .topbar {
   flex: none;
   height: 36px;
@@ -183,6 +184,31 @@ code {
 .topbar .spacer {
   flex: 1;
   min-width: 0;
+}
+
+.nav-pill {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 14px;
+  background: var(--control);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  font: 500 12px/16px var(--font-ui);
+  letter-spacing: 0.75px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.9);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.nav-pill:hover:not(:disabled) {
+  color: #fff;
+}
+
+.nav-pill:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1a1a;
 }
 
 .dot {
@@ -524,6 +550,7 @@ code {
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -557,7 +584,7 @@ code {
   position: relative;
   z-index: 1;
   width: min(720px, 100% - 32px);
-  margin-top: -12px;
+  margin-top: 6px;
   overflow: hidden;
   border: 1px solid var(--gold-dark);
   border-radius: 14px;
@@ -991,124 +1018,244 @@ code {
   }
 }
 
-/* ---- side panels ---- */
-.chat {
-  flex: 1;
+/* ---- side panels and the chat: Evolution UI Kit geometry (Inter on black glass, inset rings, 4/8/22
+   radii), the game's own accents. ---- */
+.hints {
+  flex: none;
   display: flex;
   flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-ui);
 }
 
-.chat-lines {
+.hints-capsule {
+  height: 44px;
+  padding: 0 6px 0 14px;
+  border: none;
+  border-radius: 22px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-ui);
+  text-align: left;
+  transition: box-shadow 150ms ease;
+}
+
+.hints-capsule:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.hints-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.hints-dot.round1 {
+  background: var(--phase-round1);
+}
+
+.hints-dot.final {
+  background: var(--phase-final);
+}
+
+.hints-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 12px/16px var(--font-ui);
+  letter-spacing: 0.75px;
+  text-transform: uppercase;
+}
+
+.hints-above {
+  flex: none;
+  font: 400 12px/16px var(--font-ui);
+  color: var(--ember);
+  white-space: nowrap;
+}
+
+.hints-capsule .spacer {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+}
+
+.hints-round {
+  flex: none;
+  font: 400 11px/16px var(--font-ui);
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+}
+
+.hints-chevron {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.hints-ladder {
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--glass);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
-  overflow-wrap: anywhere;
 }
 
-.chat-line b {
-  display: block;
-  font-weight: normal;
-  font-size: 11px;
-  color: var(--gold);
-}
-
-.chat-line.mine b {
-  color: var(--muted);
-}
-
-.chat form {
-  flex: none;
+.hints-head {
   display: flex;
-  gap: 6px;
-  margin-top: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
 }
 
-.chat input {
+.hints-head-round {
+  font: 600 10px/16px var(--font-ui);
+  letter-spacing: 0.75px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.hints-head-next {
+  font: 400 11px/16px var(--font-ui);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.rung {
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rung.you {
+  background: rgba(226, 187, 69, 0.12);
+}
+
+.rung.below {
+  opacity: 0.45;
+}
+
+.rung-name {
   flex: 1;
   min-width: 0;
-}
-
-.hands {
-  flex: none;
-}
-
-.combos {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  line-height: 1.25;
-}
-
-.combos th {
-  text-align: left;
-  font-weight: normal;
-  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ink);
-  padding: 1px 8px 1px 6px;
+  font: 400 13px/16px var(--font-ui);
+  color: #fff;
 }
 
-.combos td {
-  vertical-align: middle;
-  padding: 1px 6px 1px 0;
+.rung-tag {
+  flex: none;
+  width: 60px;
   text-align: right;
+  font: 600 9px/16px var(--font-ui);
+  letter-spacing: 0.75px;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.combos tr.active th,
-.combos tr.active td {
-  color: var(--gold);
-  background: var(--parchment);
+.rung.beats .rung-tag {
+  color: var(--ember);
+}
+
+.rung.you .rung-tag {
+  color: var(--gold-light);
+}
+
+.rung.below .rung-tag {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .history {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--glass);
+  font-family: var(--font-ui);
 }
 
-.history ul {
+.history-head {
+  flex: none;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--glass-head);
+  font: 500 14px/24px var(--font-ui);
+  letter-spacing: 0.75px;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.history-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.history li {
+  padding: 8px 12px;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 3px 0;
-  border-top: 1px solid var(--line);
+  flex-direction: column;
+  scrollbar-width: thin;
 }
 
-.history li:first-child {
-  border-top: none;
+.history-body .muted {
+  padding: 8px 0;
+  font: 400 13px/18px var(--font-ui);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.hist-group {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .hist-hand {
-  flex: none;
-  color: var(--ink);
+  font: 600 10px/16px var(--font-ui);
+  letter-spacing: 0.75px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.hist-row {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .hist-stage {
   flex: none;
-  width: 20px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
-  color: var(--muted);
+  width: 22px;
+  font: 500 11px/16px var(--font-ui);
+}
+
+.hist-stage.round1 {
+  color: var(--phase-round1);
+}
+
+.hist-stage.final {
+  color: var(--phase-final);
 }
 
 .hist-winners {
@@ -1116,26 +1263,196 @@ code {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
 }
 
 .hist-winner {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ink);
+  font: 400 13px/18px var(--font-ui);
+  color: #fff;
 }
 
 .hist-winner b {
   font-weight: normal;
-  color: var(--gold);
+  color: var(--gold-light);
   font-variant-numeric: tabular-nums;
 }
 
 .hist-note {
   flex: none;
-  font-size: 11px;
-  font-style: italic;
+  font: 400 11px/16px var(--font-ui);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* The chat hangs in the top-left corner of the board: the popover opens downwards from the round button. */
+.chat-pop {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  font-family: var(--font-ui);
+}
+
+.chat-button {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--control);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.chat-button:hover:not(:disabled) {
+  color: #fff;
+}
+
+.chat-button.active,
+.chat-button.active:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1a1a1a;
+}
+
+.chat-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 9.5px;
+  border-radius: 150px;
+  background: linear-gradient(0deg, var(--gold-dark) 0%, var(--gold-light) 25%, #f8e39b 50%, var(--gold-light) 73%, #f8e39b 100%);
+  font: 700 16px/30px var(--font-ui);
+  color: #000;
+  white-space: nowrap;
+}
+
+.chat-panel {
+  width: 300px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--glass);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-lines {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: thin;
+}
+
+.chat-line {
+  font: 400 13px/18px var(--font-ui);
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+
+.chat-line .other {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.chat-line .mine {
+  color: var(--gold-light);
+}
+
+.chat-line .sep {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.chat-phrases {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+
+.chat-phrase {
+  height: 30px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  font: 500 12px/30px var(--font-ui);
+  color: rgba(255, 255, 255, 0.9);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.chat-phrase:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.chat-phrase:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.chat-input {
+  height: 36px;
+  padding: 0 8px 0 12px;
+  border-radius: 18px;
+  background: var(--control);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font: 400 12px/16px var(--font-ui);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.chat-input button {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 150ms ease;
+}
+
+.chat-input button:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chat-input.ready button,
+.chat-input.ready button:hover:not(:disabled) {
+  color: var(--gold-light);
 }
 
 /* ---- mini cards: the element is the colour, the power is the number ---- */
@@ -1158,6 +1475,12 @@ code {
   width: 18px;
   height: 24px;
   font-size: 11px;
+}
+
+.mini.xs {
+  width: 16px;
+  height: 22px;
+  font: 600 9px/1 var(--font-ui);
 }
 
 .mini.fire {
@@ -1190,4 +1513,8 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+
+.mini-row.tight {
+  gap: 2px;
 }

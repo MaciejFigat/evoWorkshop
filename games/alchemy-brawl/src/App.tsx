@@ -1,6 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { Chat } from './Chat';
-import { CombinationTable, activeCombination } from './CombinationTable';
+import { HandHints, activeCombination } from './HandHints';
 import { History } from './History';
 import { Lobby } from './Lobby';
 import type { Net, NetState } from './net';
@@ -49,15 +48,20 @@ export function App({ net }: { net: Net }) {
 
   return (
     <main className="shell">
-      <aside className="side">
-        <Chat net={net} lines={state.chat} playerId={state.playerId} enabled={table !== null} />
-      </aside>
       <section className="centre">
         {state.error !== null && <p className="error">{state.error.replaceAll('_', ' ')}</p>}
         {table === null ? (
           <Welcome net={net} state={state} />
         ) : (
-          <TableScreen net={net} table={table} seq={state.seq} receivedAt={state.receivedAt} status={state.status} />
+          <TableScreen
+            net={net}
+            table={table}
+            seq={state.seq}
+            receivedAt={state.receivedAt}
+            status={state.status}
+            chat={state.chat}
+            playerId={state.playerId}
+          />
         )}
       </section>
       <aside className="side">
@@ -67,10 +71,7 @@ export function App({ net }: { net: Net }) {
           </div>
         ) : (
           <>
-            <div className="panel hands">
-              <h3>Hands</h3>
-              <CombinationTable phase={hand?.phase ?? null} active={hand === null ? null : activeCombination(hand, picked)} />
-            </div>
+            <HandHints phase={hand?.phase ?? null} active={hand === null ? null : activeCombination(hand, picked)} />
             <History entries={state.history} />
           </>
         )}

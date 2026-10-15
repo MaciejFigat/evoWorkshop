@@ -8,16 +8,19 @@ import {
   type HandView,
   type Phase,
 } from '@evo/alchemy-brawl/engine';
+import { useState } from 'react';
+import { Icon } from './Icon';
 import { CardRow } from './MiniCard';
 import type { Selection } from './selection';
+import { categoryName } from './text';
 
 const card = (element: Card['element'], power: number): Card => ({ element, power });
 
-type Row = { category: Category; name: string; example: Card[] };
+type Rung = { category: Category; name: string; example: Card[] };
 
 // Best first, as the player reads it; the engine's rank maps run the other way. The example shows
 // the pattern: same element for a flush, consecutive powers for a straight.
-const THREE_CARD_ROWS: Row[] = [
+const THREE_CARD_LADDER: Rung[] = [
   { category: 'straightFlush', name: 'Straight flush', example: [card('fire', 7), card('fire', 8), card('fire', 9)] },
   { category: 'three', name: 'Three of a kind', example: [card('fire', 5), card('water', 5), card('earth', 5)] },
   { category: 'straight', name: 'Straight', example: [card('earth', 4), card('air', 5), card('water', 6)] },
@@ -28,7 +31,7 @@ const THREE_CARD_ROWS: Row[] = [
 
 // Five-card poker for the Final (spec §5.2): a flush beats a straight here. Examples are laid out
 // the way the engine orders a live combination: groups first, then kickers, high powers first.
-const FIVE_CARD_ROWS: Row[] = [
+const FIVE_CARD_LADDER: Rung[] = [
   {
     category: 'straightFlush',
     name: 'Straight flush',
@@ -76,17 +79,23 @@ const FIVE_CARD_ROWS: Row[] = [
   },
 ];
 
-// Round 1 ranks three cards; the Final five (spec §5.3). Without a hand the table shows Round 1.
-function rowsFor(phase: Phase | null): Row[] {
+type Round = { ladder: Rung[]; dot: 'round1' | 'final'; short: string; label: string; next: string };
+
+// The short labels match the history's R1 / F.
+const ROUND1: Round = { ladder: THREE_CARD_LADDER, dot: 'round1', short: 'R1 · 3 cards', label: 'Round 1 · 3 cards', next: 'F · 5 cards' };
+const FINAL: Round = { ladder: FIVE_CARD_LADDER, dot: 'final', short: 'F · 5 cards', label: 'Final · 5 cards', next: 'showdown' };
+
+// Round 1 ranks three cards; the Final five (spec §5.3). Without a hand the ladder shows Round 1.
+function roundFor(phase: Phase | null): Round {
   switch (phase) {
     case null:
     case 'decide':
     case 'round1End':
-      return THREE_CARD_ROWS;
+      return ROUND1;
     case 'bet':
     case 'reveal':
     case 'done':
-      return FIVE_CARD_ROWS;
+      return FINAL;
   }
 }
 
@@ -107,9 +116,9 @@ function bestOption(hand: HandView): Combination | null {
   return best;
 }
 
-// The row that is live right now: in Round 1 the card you show (locked, picked, else your best
+// The rung that is live right now: in Round 1 the card you show (locked, picked, else your best
 // option); after Round 1 your shown card's combination if you stayed; in the Final your best five
-// cards among the hand and the table.
+// cards among the hand and the table. Null when you skipped Round 1 or are not seated.
 export function activeCombination(hand: HandView, picked: Selection): Combination | null {
   const you = hand.you;
   if (you === null) {
@@ -138,22 +147,66 @@ export function activeCombination(hand: HandView, picked: Selection): Combinatio
   }
 }
 
-export function CombinationTable({ phase, active }: { phase: Phase | null; active: Combination | null }) {
+// The capsule has one short line next to the counter and the round label, so it names the group
+// ('pair of 10s') or just the category; the ladder row and the dock carry the full description.
+function capsuleTitle(combination: Combination): string {
+  const power = combination.key[1] ?? 0;
+  switch (combination.category) {
+    case 'pair':
+      return `pair of ${power}s`;
+    case 'three':
+      return `three ${power}s`;
+    case 'four':
+      return `four ${power}s`;
+    default:
+      return categoryName(combination.category);
+  }
+}
+
+type Standing = 'beats' | 'you' | 'below' | 'none';
+
+const TAG: Record<Standing, string> = { beats: 'Beats you', you: 'You', below: 'Below', none: '' };
+
+// A capsule with your current combination and how many rungs beat it (none: the counter is left out,
+// which also keeps 'straight flush' on one line); click to unfold the ladder of the current round with
+// your position on it.
+export function HandHints({ phase, active }: { phase: Phase | null; active: Combination | null }) {
+  const [open, setOpen] = useState(true);
+  const round = roundFor(phase);
+  const youAt = active === null ? -1 : round.ladder.findIndex((rung) => rung.category === active.category);
+  const title = active === null ? (phase === 'decide' || phase === 'round1End' ? 'Skipped' : 'No hand') : capsuleTitle(active);
   return (
-    <table className="combos">
-      <tbody>
-        {rowsFor(phase).map((row) => {
-          const live = active !== null && active.category === row.category;
-          return (
-            <tr key={row.category} className={live ? 'active' : ''}>
-              <th>{row.name}</th>
-              <td>
-                <CardRow cards={live ? active.cards : row.example} size="sm" />
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="hints">
+      <button type="button" className="hints-capsule" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        <span className={`hints-dot ${round.dot}`} />
+        <span className="hints-title" title={title}>
+          {title}
+        </span>
+        {youAt > 0 && <span className="hints-above">{youAt} above</span>}
+        <span className="spacer" />
+        <span className="hints-round">{round.short}</span>
+        <span className="hints-chevron">
+          <Icon name={open ? 'chevronUp' : 'chevronDown'} size={20} />
+        </span>
+      </button>
+      {open && (
+        <div className="hints-ladder">
+          <div className="hints-head">
+            <span className="hints-head-round">{round.label}</span>
+            <span className="hints-head-next">next: {round.next}</span>
+          </div>
+          {round.ladder.map((rung, i) => {
+            const standing: Standing = youAt < 0 ? 'none' : i < youAt ? 'beats' : i === youAt ? 'you' : 'below';
+            return (
+              <div key={rung.category} className={`rung ${standing}`}>
+                <span className="rung-name">{rung.name}</span>
+                <CardRow cards={standing === 'you' && active !== null ? active.cards : rung.example} size="xs" />
+                <span className="rung-tag">{TAG[standing]}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
