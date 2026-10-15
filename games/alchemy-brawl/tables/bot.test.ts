@@ -1,28 +1,53 @@
-import { bestCombination, bestOfCards, type Card, type HandView, type YouView } from '@evo/alchemy-brawl/engine';
+import { bestCombination, bestOfCards, type BetOptions, type Card, type HandView } from '@evo/alchemy-brawl/engine';
 import { mulberry32 } from '@evo/rng';
 import { describe, expect, it } from 'vitest';
-import { chooseBotMove } from './bot.ts';
+import { chooseBotMove, type BotMove } from './bot.ts';
 
 const f = (power: number): Card => ({ element: 'fire', power });
 const w = (power: number): Card => ({ element: 'water', power });
 const e = (power: number): Card => ({ element: 'earth', power });
 const a = (power: number): Card => ({ element: 'air', power });
 
-type Setup = { phase: HandView['phase']; table: Card[]; hand: Card[] } & Partial<Pick<YouView, 'canDecide' | 'legalBets'>>;
+type Setup = {
+  phase: HandView['phase'];
+  table: Card[];
+  hand: Card[];
+  canDecide?: boolean;
+  bet?: BetOptions;
+  stack?: number;
+  level?: number;
+  pot?: number;
+};
+
+const STACK = 990;
 
 // Builds the view the engine would publish: Round 1 show options in 'decide', the best three among
-// hand and table once the Final is on.
+// hand and table plus the betting options once the Final is on.
 function view(setup: Setup): HandView {
   const inFinal = setup.phase === 'bet' || setup.phase === 'reveal' || setup.phase === 'done';
+  const level = setup.level ?? 0;
   return {
     phase: setup.phase,
     button: 0,
     round1Pot: 9,
-    finalPot: 21,
+    finalPot: setup.pot ?? 21,
     table: setup.table,
     deckCount: 30,
-    players: [],
-    betting: null,
+    players: [
+      {
+        id: 'bot-1',
+        stack: setup.stack ?? STACK,
+        handCount: setup.hand.length,
+        decided: true,
+        stayed: inFinal ? false : null,
+        shown: null,
+        folded: false,
+        allIn: false,
+        committed: 10,
+        roundCommitted: 0,
+      },
+    ],
+    betting: setup.phase === 'bet' ? { level, minRaise: 30, actor: 0 } : null,
     round1: null,
     final: null,
     you: {
@@ -30,12 +55,42 @@ function view(setup: Setup): HandView {
       hand: setup.hand,
       decision: null,
       canDecide: setup.canDecide ?? false,
-      legalBets: setup.legalBets ?? [],
+      bet: setup.bet ?? null,
       options: setup.phase === 'decide' ? setup.hand.map((card) => ({ card, combination: bestCombination(card, setup.table) })) : [],
       best: inFinal ? bestOfCards([...setup.hand, ...setup.table]) : null,
     },
   };
 }
+
+// A bet of 30 is in front of the seat, which has not put anything in yet.
+const facingBet = (stack = STACK): Setup => ({
+  phase: 'bet',
+  table: [f(5), w(6), e(9)],
+  hand: [],
+  stack,
+  level: 30,
+  pot: 81,
+  bet: { canCheck: false, call: Math.min(30, stack), callAllIn: stack <= 30, raise: stack > 30 ? { min: Math.min(60, stack), max: stack } : null },
+});
+
+const unopened: Setup = {
+  phase: 'bet',
+  table: [f(5), w(6), e(9)],
+  hand: [],
+  pot: 21,
+  bet: { canCheck: true, call: 0, callAllIn: false, raise: { min: 30, max: STACK } },
+};
+
+const STRAIGHT = [e(7), w(9), f(13)];
+const PAIR = [e(5), a(2), a(13), w(11)];
+const HIGH = [w(2), f(13), e(3)];
+
+function sample(setup: Setup, n = 200): BotMove[] {
+  return Array.from({ length: n }, (_, seed) => chooseBotMove(view(setup), mulberry32(seed + 1))).flatMap((m) => (m === null ? [] : [m]));
+}
+
+const kinds = (moves: BotMove[], kind: string): number =>
+  moves.filter((m) => m.type === 'bet' && m.action.kind === kind).length;
 
 describe('chooseBotMove', () => {
   it('stays with a pair, showing the card that makes it', () => {
@@ -56,9 +111,9 @@ describe('chooseBotMove', () => {
 
   it('skips with nothing unless the bluff roll hits', () => {
     const setup: Setup = { phase: 'decide', canDecide: true, table: [f(5), w(9)], hand: [e(2), w(7), f(11)] };
-    const outcomes = Array.from({ length: 200 }, (_, seed) => chooseBotMove(view(setup), mulberry32(seed + 1)));
-    const skips = outcomes.filter((m) => m?.type === 'decide' && m.decision.kind === 'skip').length;
-    const bluffs = outcomes.filter((m) => m?.type === 'decide' && m.decision.kind === 'stay');
+    const outcomes = sample(setup);
+    const skips = outcomes.filter((m) => m.type === 'decide' && m.decision.kind === 'skip').length;
+    const bluffs = outcomes.filter((m) => m.type === 'decide' && m.decision.kind === 'stay');
     expect(skips).toBeGreaterThan(120);
     expect(bluffs.length).toBeGreaterThan(10);
     for (const bluff of bluffs) {
@@ -66,43 +121,89 @@ describe('chooseBotMove', () => {
     }
   });
 
-  it('raises with a straight made from the hand and the table', () => {
-    const move = chooseBotMove(
-      view({ phase: 'bet', table: [f(5), w(6), e(9)], hand: [e(7), w(9), f(13)], legalBets: ['fold', 'call', 'raise'] }),
-      mulberry32(1),
-    );
-    expect(move).toEqual({ type: 'bet', kind: 'raise' });
+  it('raises a straight by the size of the pot', () => {
+    const move = chooseBotMove(view({ ...facingBet(), hand: STRAIGHT }), mulberry32(1));
+    expect(move).toEqual({ type: 'bet', action: { kind: 'raise', to: 30 + 81 } });
   });
 
-  it('bets a pair about half the time and otherwise checks', () => {
-    const setup: Setup = { phase: 'bet', table: [f(5), w(6), e(9)], hand: [e(5), a(2), a(13), w(11)], legalBets: ['check', 'bet'] };
-    const outcomes = Array.from({ length: 200 }, (_, seed) => chooseBotMove(view(setup), mulberry32(seed + 1)));
-    const bets = outcomes.filter((m) => m?.type === 'bet' && m.kind === 'bet').length;
-    const checks = outcomes.filter((m) => m?.type === 'bet' && m.kind === 'check').length;
-    expect(bets + checks).toBe(200);
-    expect(bets).toBeGreaterThan(60);
-    expect(checks).toBeGreaterThan(60);
+  it('opens a straight for the minimum when the pot is smaller than the minimum bet', () => {
+    const move = chooseBotMove(view({ ...unopened, hand: STRAIGHT }), mulberry32(1));
+    expect(move).toEqual({ type: 'bet', action: { kind: 'raise', to: 30 } });
   });
 
-  it('checks with a high card and never bets it', () => {
-    const move = chooseBotMove(
-      view({ phase: 'bet', table: [f(5), w(6), e(9)], hand: [w(2), f(13), e(3)], legalBets: ['check', 'bet'] }),
-      mulberry32(1),
-    );
-    expect(move).toEqual({ type: 'bet', kind: 'check' });
+  it('caps a pot-sized raise at the stack and calls when it cannot raise', () => {
+    const short = chooseBotMove(view({ ...facingBet(50), hand: STRAIGHT, pot: 500 }), mulberry32(1));
+    expect(short).toEqual({ type: 'bet', action: { kind: 'raise', to: 50 } });
+    const covered = chooseBotMove(view({ ...facingBet(20), hand: STRAIGHT }), mulberry32(1));
+    expect(covered).toEqual({ type: 'bet', action: { kind: 'call' } });
   });
 
-  it('mostly folds a high card to a bet', () => {
-    const setup: Setup = { phase: 'bet', table: [f(5), w(6), e(9)], hand: [w(2), f(13), e(3)], legalBets: ['fold', 'call', 'raise'] };
-    const outcomes = Array.from({ length: 200 }, (_, seed) => chooseBotMove(view(setup), mulberry32(seed + 1)));
-    const folds = outcomes.filter((m) => m?.type === 'bet' && m.kind === 'fold').length;
-    const calls = outcomes.filter((m) => m?.type === 'bet' && m.kind === 'call').length;
+  it('raises a pair to the minimum now and then and otherwise calls a cheap bet', () => {
+    const outcomes = sample({ ...facingBet(), hand: PAIR });
+    const raises = outcomes.filter((m) => m.type === 'bet' && m.action.kind === 'raise');
+    const calls = kinds(outcomes, 'call');
+    expect(raises.length + calls).toBe(200);
+    expect(raises.length).toBeGreaterThan(30);
+    expect(calls).toBeGreaterThan(100);
+    for (const raise of raises) {
+      expect(raise).toEqual({ type: 'bet', action: { kind: 'raise', to: 60 } });
+    }
+  });
+
+  it('folds a pair to an expensive bet some of the time and calls the rest', () => {
+    const expensive: Setup = {
+      ...facingBet(100),
+      hand: PAIR,
+      level: 500,
+      bet: { canCheck: false, call: 100, callAllIn: true, raise: null },
+    };
+    const outcomes = sample(expensive);
+    const folds = kinds(outcomes, 'fold');
+    const calls = kinds(outcomes, 'call');
+    expect(folds + calls).toBe(200);
+    expect(folds).toBeGreaterThan(30);
+    expect(calls).toBeGreaterThan(folds);
+  });
+
+  it('checks a pair when nothing is in front of it unless the raise roll hits', () => {
+    const outcomes = sample({ ...unopened, hand: PAIR });
+    expect(kinds(outcomes, 'check') + kinds(outcomes, 'raise')).toBe(200);
+    expect(kinds(outcomes, 'check')).toBeGreaterThan(100);
+  });
+
+  it('checks with a high card and never raises it', () => {
+    const outcomes = sample({ ...unopened, hand: HIGH });
+    expect(kinds(outcomes, 'check')).toBe(200);
+  });
+
+  it('mostly folds a high card to a cheap bet and always folds to an expensive one', () => {
+    const cheap = sample({ ...facingBet(), hand: HIGH });
+    const folds = kinds(cheap, 'fold');
+    const calls = kinds(cheap, 'call');
     expect(folds + calls).toBe(200);
     expect(folds).toBeGreaterThan(calls);
     expect(calls).toBeGreaterThan(20);
+    const expensive = sample({ ...facingBet(), hand: HIGH, level: 200, bet: { canCheck: false, call: 200, callAllIn: false, raise: { min: 400, max: STACK } } });
+    expect(kinds(expensive, 'fold')).toBe(200);
+  });
+
+  it('never raises above its stack', () => {
+    const short = (hand: Card[]): Setup => ({
+      ...facingBet(45),
+      hand,
+      pot: 500,
+      bet: { canCheck: false, call: 30, callAllIn: false, raise: { min: 45, max: 45 } },
+    });
+    for (const hand of [STRAIGHT, PAIR, HIGH]) {
+      for (const move of sample(short(hand), 100)) {
+        if (move.type === 'bet' && move.action.kind === 'raise') {
+          expect(move.action.to).toBeLessThanOrEqual(45);
+        }
+      }
+    }
   });
 
   it('does nothing when it is not its turn', () => {
-    expect(chooseBotMove(view({ phase: 'bet', table: [f(5), w(6), e(9)], hand: [w(2), f(13), e(3)] }), mulberry32(1))).toBeNull();
+    expect(chooseBotMove(view({ phase: 'bet', table: [f(5), w(6), e(9)], hand: HIGH }), mulberry32(1))).toBeNull();
   });
 });

@@ -1,4 +1,6 @@
 import {
+  FINAL_TABLE,
+  ROUND1_TABLE,
   sameCard,
   type Card,
   type HandEvent,
@@ -19,7 +21,8 @@ type HandCard = { card: Card; view: Phaser.GameObjects.Container; ring: Phaser.G
 
 const ARC = { x: WIDTH / 2, y: 330, rx: 450, ry: 250, from: 190, to: 350 };
 const MY_SEAT: Point = { x: 200, y: 600 };
-const HAND_Y = 634;
+// The dock overlaps the bottom rim of the board; the hand sits clear of it.
+const HAND_Y = 612;
 const HAND = { w: 110, h: 154, gap: 14 };
 const TABLE_CARD = { w: 100, h: 140, gap: 24 };
 const TABLE_Y = 292;
@@ -44,6 +47,8 @@ export class TableScene extends Phaser.Scene {
   // Where every face-up card was drawn this frame, so an effect can start from the cards it is about.
   private cardAt = new Map<string, Point>();
   private handCards: HandCard[] = [];
+  // Your hand as drawn last time, so the Final's draw can animate only the card that is new.
+  private lastHand: Card[] = [];
   private readonly dpr: number;
 
   constructor(net: Net, dpr: number) {
@@ -76,10 +81,12 @@ export class TableScene extends Phaser.Scene {
       return;
     }
     this.seq = seq;
+    const previous = this.lastHand;
     this.draw(table);
     if (table?.hand) {
-      this.play(table.hand, events);
+      this.play(table.hand, events, previous);
     }
+    this.lastHand = table?.hand?.you?.hand ?? [];
   }
 
   private draw(table: TableView | null): void {
@@ -138,6 +145,9 @@ export class TableScene extends Phaser.Scene {
     }
     if (hand.betting?.actor === seat) {
       return 'to act';
+    }
+    if (player.allIn) {
+      return 'all-in';
     }
     if (player.stayed === true) {
       return 'stayed';
@@ -238,7 +248,8 @@ export class TableScene extends Phaser.Scene {
 
   private drawCenter(hand: HandView): Phaser.GameObjects.Container {
     const container = this.add.container(0, 0);
-    const slots = hand.phase === 'decide' || hand.phase === 'round1End' ? 2 : 3;
+    // Three slots in every phase: the Round 1 pair never moves and the third slot waits for the Final.
+    const slots = FINAL_TABLE;
     for (let i = 0; i < slots; i += 1) {
       const x = WIDTH / 2 + (i - (slots - 1) / 2) * (TABLE_CARD.w + TABLE_CARD.gap);
       const card = hand.table[i];
@@ -346,17 +357,31 @@ export class TableScene extends Phaser.Scene {
     }
   }
 
-  private play(hand: HandView, events: HandEvent[]): void {
+  // `previous` is your hand before this message: on the Final's draw only the new cards animate.
+  private play(hand: HandView, events: HandEvent[], previous: Card[]): void {
     for (const event of events) {
       switch (event.type) {
         case 'round1Started':
-        case 'finalStarted':
-          this.flipIn(this.tableCards, 120);
+          this.flipIn(this.tableCards.slice(0, ROUND1_TABLE), 120);
           this.flipIn(
             this.handCards.map((entry) => entry.view),
             80,
           );
           break;
+        case 'finalStarted': {
+          this.flipIn(this.tableCards.slice(ROUND1_TABLE), 0);
+          const drawn = this.handCards.filter((entry) => !previous.some((card) => sameCard(card, entry.card)));
+          this.flipIn(
+            drawn.map((entry) => entry.view),
+            80,
+          );
+          for (const [seat, view] of this.seatViews) {
+            if (seat !== hand.you?.seat && hand.players[seat]?.folded === false) {
+              this.pop(view, 1.12);
+            }
+          }
+          break;
+        }
         case 'decisionLocked':
           this.pop(this.seatViews.get(event.seat), 1.18);
           break;
@@ -372,7 +397,7 @@ export class TableScene extends Phaser.Scene {
           }
           break;
         case 'betPlaced':
-          this.float(event.seat, event.amount > 0 ? `${event.kind} ${event.amount}` : event.kind, MUTED, 0);
+          this.float(event.seat, betLabel(event), MUTED, 0);
           break;
         case 'handEnded':
           this.reveal(
@@ -483,4 +508,9 @@ export class TableScene extends Phaser.Scene {
 
 function cardId(card: Card): string {
   return `${card.element}-${card.power}`;
+}
+
+function betLabel(event: Extract<HandEvent, { type: 'betPlaced' }>): string {
+  const paid = event.amount > 0 ? ` ${event.amount}` : '';
+  return event.allIn && event.amount > 0 ? `all-in${paid}` : `${event.kind}${paid}`;
 }

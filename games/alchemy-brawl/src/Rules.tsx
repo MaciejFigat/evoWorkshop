@@ -5,11 +5,11 @@ import { CardRow, MiniBack, MiniCard, type MiniSize } from './MiniCard';
 const card = (element: Card['element'], power: number): Card => ({ element, power });
 
 // One worked hand runs through the four steps: the 9 Water shown in Round 1 makes a straight with
-// the table; in the Final the 10 Fire joins the two fire table cards for the best three.
+// the table; in the Final the 11 Fire joins the pair, and the drawn 11 Water makes three 11s.
 const SHOWN = card('water', 9);
 const ROUND1_TABLE = [card('air', 10), card('earth', 11)];
-const FINAL_TABLE = [card('fire', 3), card('fire', 6), card('earth', 9)];
-const FINAL_HAND = [SHOWN, card('fire', 10), card('earth', 4), card('air', 2)];
+const FINAL_TABLE = [...ROUND1_TABLE, card('fire', 11)];
+const FINAL_HAND = [SHOWN, card('fire', 4), card('air', 2), card('water', 11)];
 
 function Backs({ count, size }: { count: number; size: MiniSize }) {
   return (
@@ -61,11 +61,11 @@ export function Rules({ compact = false }: { compact?: boolean }) {
         <Step
           number={3}
           title="Draw and bet"
-          caption="Everyone draws to 4. Three table cards go up, then fixed-limit betting for 70% plus the bets."
+          caption="Everyone draws to 4. A third table card joins the pair, then no-limit betting for 70% plus the bets."
         >
           <Backs count={4} size={size} />
           <span className="step-gap" />
-          <CardRow cards={FINAL_TABLE} size={size} />
+          <CardRow cards={FINAL_TABLE} size={size} lit={[2]} />
           <span className="rules-bets">
             <span className="rules-bet fold">Fold</span>
             <span className="rules-bet call">Call</span>
@@ -73,10 +73,10 @@ export function Rules({ compact = false }: { compact?: boolean }) {
           </span>
         </Step>
         <Step number={4} title="Showdown" caption="Best three cards among your hand and the table win. Equal hands split. Nothing is ever discarded.">
-          <CardRow cards={FINAL_HAND} size={size} lit={[1]} />
+          <CardRow cards={FINAL_HAND} size={size} lit={[3]} />
           <span className="step-gap" />
-          <CardRow cards={FINAL_TABLE} size={size} lit={[0, 1]} />
-          <span className="step-label">fire flush</span>
+          <CardRow cards={FINAL_TABLE} size={size} lit={[1, 2]} />
+          <span className="step-label">three 11s</span>
         </Step>
       </ol>
     </div>

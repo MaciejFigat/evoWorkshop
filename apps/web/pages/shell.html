@@ -1211,7 +1211,7 @@ main:focus { outline: none; }
       stage: 'playtesting',
       addedDaysAgo: 4,
       updatedDaysAgo: 0,
-      version: '0.5.0',
+      version: '0.6.0',
       cover: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMjAgMjAwIj4KICA8cmVjdCB3aWR0aD0iMzIwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzE0MTEwZiIvPgogIDxnIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLCBzZXJpZiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+CiAgICA8cmVjdCB4PSI3MCIgeT0iNTAiIHdpZHRoPSI3MCIgaGVpZ2h0PSIxMDAiIHJ4PSI2IiBmaWxsPSIjMWQxYTE3IiBzdHJva2U9IiNlNDU3MmUiIHN0cm9rZS13aWR0aD0iMyIgdHJhbnNmb3JtPSJyb3RhdGUoLTEwIDEwNSAxMDApIi8+CiAgICA8dGV4dCB4PSIxMDUiIHk9IjExMiIgZm9udC1zaXplPSIzNiIgZmlsbD0iI2U4ZGNjNCIgdHJhbnNmb3JtPSJyb3RhdGUoLTEwIDEwNSAxMDApIj45PC90ZXh0PgogICAgPHJlY3QgeD0iMTgwIiB5PSI1MCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjEwMCIgcng9IjYiIGZpbGw9IiMxZDFhMTciIHN0cm9rZT0iIzNhODZmZiIgc3Ryb2tlLXdpZHRoPSIzIiB0cmFuc2Zvcm09InJvdGF0ZSgxMCAyMTUgMTAwKSIvPgogICAgPHRleHQgeD0iMjE1IiB5PSIxMTIiIGZvbnQtc2l6ZT0iMzYiIGZpbGw9IiNlOGRjYzQiIHRyYW5zZm9ybT0icm90YXRlKDEwIDIxNSAxMDApIj45PC90ZXh0PgogICAgPGNpcmNsZSBjeD0iMTYwIiBjeT0iMTAwIiByPSIxNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYzlhMjI3IiBzdHJva2Utd2lkdGg9IjIiLz4KICAgIDx0ZXh0IHg9IjE2MCIgeT0iMTg1IiBmb250LXNpemU9IjE4IiBmaWxsPSIjYzlhMjI3Ij5BTENIRU1ZIEJSQVdMPC90ZXh0PgogIDwvZz4KPC9zdmc+Cg==',
       demo: { kind: 'fullstack', url: 'http://localhost:5190', repo: 'games/alchemy-brawl', command: 'yarn brawl' },
       popularity: 0.9,
@@ -1223,18 +1223,18 @@ main:focus { outline: none; }
       tags: ['multiplayer', 'cards', 'table'],
       tagline: 'Two rounds: one shown card against two table cards, then your whole hand against three.',
       description:
-        'A table for 3–11 seats. Round 1 is a free stay-or-skip gamble for 30% of the antes: turn one card face up, and it plays with the two table cards. Nothing is spent and nobody discards. Everyone draws to 4 cards, three table cards go up, and the Final is fixed-limit betting for the rest: all your cards play, the best three among your hand and the table decide the showdown. Play money only in this prototype.',
+        'A table for 3–11 seats. Round 1 is a free stay-or-skip gamble for 30% of the antes: turn one card face up, and it plays with the two table cards. Nothing is spent and nobody discards. Everyone draws to 4 cards, a third table card joins the two from Round 1, and the Final is no-limit betting for the rest: fold, check, call or raise to any amount from 30, all-in allowed. All your cards play, the best three among your hand and the table decide the showdown. Play money only in this prototype.',
       passport: {
         kind: 'Game',
         randomness: 'Shuffled deck, one server seed per hand',
-        decisions: 'Round 1: stay (which card to show) or skip; Final: check, bet, call, raise or fold',
+        decisions: 'Round 1: stay (which card to show) or skip; Final, no limit: fold, check, call or raise to any amount, all-in allowed',
         roundFormat: 'Multiplayer table, 3–11 seats, 60–90 s per hand',
         business: 'Rake from pots (peer-to-peer licence); play money here',
         embedding: 'A standalone game',
         redFlags: 'Collusion, bots at real-money tables',
       },
       readme:
-        '# Alchemy Brawl\n\nA multiplayer card game with its own tables on this server.\n\n## Play\nEnter a name, create a table or join one by its code, and add bots to fill the seats.\n\n## Rules\n- Everyone antes; 30% goes to Round 1, 70% to the Final.\n- Round 1: stay (turn one card face up) or skip. No betting, nothing is spent. Your shown card plus the two table cards make a three-card poker hand; the shown card stays in your hand, face up, until the hand ends.\n- Everyone draws a card, to 4. Final: three table cards go up, then fixed-limit betting. All your cards play.\n- Showdown: the best three cards among your hand and the table, ranked as a three-card poker hand.',
+        '# Alchemy Brawl\n\nA multiplayer card game with its own tables on this server.\n\n## Play\nEnter a name, create a table or join one by its code, and add bots to fill the seats.\n\n## Rules\n- Everyone antes; 30% goes to Round 1, 70% to the Final.\n- Round 1: stay (turn one card face up) or skip. No betting, nothing is spent. Your shown card plus the two table cards make a three-card poker hand; the shown card stays in your hand, face up, until the hand ends.\n- Everyone draws a card, to 4. Final: a third table card joins the two from Round 1, then no-limit betting: fold, check, call, or raise to any amount from a minimum of 30; all-in is allowed and side pots are standard. All your cards play.\n- Showdown: the best three cards among your hand and the table, ranked as a three-card poker hand.',
       video: { duration: '3:05', chapters: [['0:00', 'Create a table'], ['0:35', 'Round 1: stay or skip'], ['1:30', 'The Final and betting'], ['2:30', 'Bots']] },
     },
     {

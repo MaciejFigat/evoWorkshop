@@ -1,0 +1,21 @@
+/* Design tokens: every colour and font in the client comes from here. */
+:root {
+  --ground: #14110f;
+  --surface: #1d1a17;
+  --raised: #2a241f;
+  --outline: #4a4038;
+  --ink: #e8dcc4;
+  --ink-muted: #9a8f7e;
+  --gold: #c9a227;
+  --gold-light: #e2bb45;
+  --gold-dark: #8a6a1a;
+  --blood: #6a1a14;
+  --ember: #d0342c;
+  --fire: #e4572e;
+  --element-fire: var(--fire);
+  --element-water: #3a86ff;
+  --element-earth: #6a994e;
+  --element-air: #d9d3b6;
+  --font-display: 'Cinzel', serif;
+  --font-body: 'Alegreya Sans', sans-serif;
+}

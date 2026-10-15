@@ -16,13 +16,13 @@ export function cards(labels: string): Card[] {
 }
 
 // Lays cards in the engine's dealing order: three cards each round-robin, the two Round 1 table
-// cards, one draw each in the same order, the three Final table cards, then the rest of the deck.
+// cards, one draw each in the same order, the third table card of the Final, then the rest of the deck.
 export function stackedDeck(
   order: number[],
   hands: Card[][],
   round1Table: Card[],
   draws: Card[][],
-  finalTable: Card[],
+  thirdCard: Card[],
 ): Card[] {
   const top: Card[] = [];
   const take = (from: Card[][], seat: number, k: number): void => {
@@ -36,6 +36,6 @@ export function stackedDeck(
   }
   top.push(...round1Table);
   order.forEach((seat) => take(draws, seat, 0));
-  top.push(...finalTable);
+  top.push(...thirdCard);
   return [...top, ...fullDeck().filter((c) => !top.some((used) => sameCard(used, c)))];
 }

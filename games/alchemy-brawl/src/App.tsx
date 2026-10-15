@@ -57,7 +57,7 @@ export function App({ net }: { net: Net }) {
         {table === null ? (
           <Welcome net={net} state={state} />
         ) : (
-          <TableScreen net={net} table={table} receivedAt={state.receivedAt} status={state.status} />
+          <TableScreen net={net} table={table} seq={state.seq} receivedAt={state.receivedAt} status={state.status} />
         )}
       </section>
       <aside className="side">
