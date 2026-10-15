@@ -9,8 +9,8 @@ canvas {
   image-rendering: crisp-edges;
   outline: none;
 }
-/* Same panel language as the HUD's portrait box (game.js): dark panel, hard pixel border,
-   no blur or rounding, a hard-offset shadow instead of a soft one. */
+/* No panel, just the glyph: a hard pixel drop-shadow (no blur) keeps it readable over any
+   part of the scene without drawing a box around it. */
 #mute-btn {
   position: absolute;
   top: 6px;
@@ -18,17 +18,15 @@ canvas {
   width: 40px;
   height: 36px;
   padding: 0;
-  background: #1a0b2a;
-  border: 2px solid #ff3d9a;
-  border-radius: 0;
+  background: none;
+  border: none;
   color: #3cff6a;
-  font: 16px/1 'Courier New', monospace;
+  font: 20px/1 'Courier New', monospace;
   font-weight: bold;
   text-align: center;
   cursor: pointer;
-  box-shadow: 3px 3px 0 #000;
+  text-shadow: 2px 2px 0 #000;
   image-rendering: pixelated;
 }
-#mute-btn:hover { background: #2a1340; }
-#mute-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+#mute-btn:active { transform: translate(1px, 1px); }
 #mute-btn[aria-pressed="true"] { color: #ff3030; }
