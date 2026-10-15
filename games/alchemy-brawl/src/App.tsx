@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react';
 import { Chat } from './Chat';
 import { CombinationTable, activeCombination } from './CombinationTable';
+import { History } from './History';
 import { Lobby } from './Lobby';
 import type { Net, NetState } from './net';
 import { Rules } from './Rules';
@@ -56,13 +57,13 @@ export function App({ net }: { net: Net }) {
         {table === null ? (
           <Welcome net={net} state={state} />
         ) : (
-          <TableScreen net={net} table={table} receivedAt={state.receivedAt} status={state.status} />
+          <TableScreen net={net} table={table} seq={state.seq} receivedAt={state.receivedAt} status={state.status} />
         )}
       </section>
       <aside className="side">
         {table === null ? (
-          <div className="panel">
-            <Rules />
+          <div className="panel rules-panel">
+            <Rules compact />
           </div>
         ) : (
           <>
@@ -70,15 +71,7 @@ export function App({ net }: { net: Net }) {
               <h3>Hands</h3>
               <CombinationTable active={hand === null ? null : activeCombination(hand, picked)} />
             </div>
-            <div className="panel history">
-              <h3>History</h3>
-              {state.history.length === 0 && <p className="muted">No hands finished yet.</p>}
-              <ul>
-                {[...state.history].reverse().map((line, i) => (
-                  <li key={`${state.history.length - i}-${line}`}>{line}</li>
-                ))}
-              </ul>
-            </div>
+            <History entries={state.history} />
           </>
         )}
       </aside>

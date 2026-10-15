@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES } from './config.ts';
-import { activeOrder, legalBets, startHand, step } from './hand.ts';
+import { activeOrder, betOptions, startHand, step } from './hand.ts';
 import { card, cards, stackedDeck } from './testDeck.ts';
-import type { BetKind, HandAction, HandEvent, HandState, StepResult } from './types.ts';
+import type { BetAction, HandAction, HandEvent, HandState, StepResult } from './types.ts';
 import { viewFor } from './view.ts';
 
 const STACK = 1000;
@@ -33,7 +33,11 @@ const stay = (seat: number, show: string): HandAction => ({
   decision: { kind: 'stay', show: card(show) },
 });
 const skip = (seat: number): HandAction => ({ type: 'decide', seat, decision: { kind: 'skip' } });
-const bets = (list: [number, BetKind][]): HandAction[] => list.map(([seat, kind]) => ({ type: 'bet', seat, kind }));
+const fold = (seat: number): HandAction => ({ type: 'bet', seat, action: { kind: 'fold' } });
+const check = (seat: number): HandAction => ({ type: 'bet', seat, action: { kind: 'check' } });
+const call = (seat: number): HandAction => ({ type: 'bet', seat, action: { kind: 'call' } });
+const raise = (seat: number, to: number): HandAction => ({ type: 'bet', seat, action: { kind: 'raise', to } });
+const bet = (seat: number, action: BetAction): HandAction => ({ type: 'bet', seat, action });
 const advance: HandAction = { type: 'advance' };
 const timeout: HandAction = { type: 'timeout' };
 
@@ -43,28 +47,32 @@ const BORIS = 1;
 const VERA = 2;
 const GLEB = 3;
 
-function appendix(): HandState {
-  const deck = stackedDeck(
+function appendixDeck() {
+  return stackedDeck(
     [BORIS, VERA, GLEB, ANA],
     [cards('7F 12E 13A'), cards('3E 10F 12W'), cards('6W 13E 9A'), cards('2F 11A 5W')],
     cards('10A 11E'),
     [cards('1W'), cards('5F'), cards('7W'), cards('8W')],
-    cards('3F 6F 9E'),
+    cards('10W'),
   );
-  return ok(startHand(DEFAULT_RULES, seats(4), ANA, deck)).state;
+}
+
+function appendix(stacks: number[] = []): HandState {
+  const stakes = seats(4).map((seat, i) => ({ ...seat, stack: stacks[i] ?? STACK }));
+  return ok(startHand(DEFAULT_RULES, stakes, ANA, appendixDeck())).state;
 }
 
 const ROUND1 = [stay(BORIS, '3E'), stay(VERA, '9A'), skip(GLEB), skip(ANA)];
-const FINAL_BETS = bets([
-  [BORIS, 'bet'],
-  [VERA, 'call'],
-  [GLEB, 'call'],
-  [ANA, 'raise'],
-  [BORIS, 'raise'],
-  [VERA, 'fold'],
-  [GLEB, 'fold'],
-  [ANA, 'call'],
-]);
+const FINAL_BETS = [
+  raise(BORIS, 30),
+  call(VERA),
+  call(GLEB),
+  raise(ANA, 60),
+  raise(BORIS, 90),
+  fold(VERA),
+  fold(GLEB),
+  call(ANA),
+];
 
 describe('a full hand (spec appendix)', () => {
   it('replays the example hand to Boris taking 268', () => {
@@ -78,6 +86,7 @@ describe('a full hand (spec appendix)', () => {
       cards('6W 13E 9A'),
       cards('2F 11A 5W'),
     ]);
+    expect(state.players.every((p) => !p.allIn)).toBe(true);
 
     state = play(state, ROUND1);
     expect(state.phase).toBe('round1End');
@@ -102,26 +111,28 @@ describe('a full hand (spec appendix)', () => {
 
     const { state: final, events: finalEvents } = ok(step(state, advance));
     state = final;
-    expect(finalEvents).toEqual([{ type: 'finalStarted', table: cards('3F 6F 9E') }]);
+    expect(finalEvents).toEqual([{ type: 'finalStarted', table: cards('10A 11E 10W') }]);
     expect(state.phase).toBe('bet');
-    expect(state.table).toEqual(cards('3F 6F 9E'));
+    expect(state.table).toEqual(cards('10A 11E 10W'));
     expect(state.players.map((p) => p.hand)).toEqual([
       cards('7F 12E 13A 1W'),
       cards('3E 10F 12W 5F'),
       cards('6W 13E 9A 7W'),
       cards('2F 11A 5W 8W'),
     ]);
-    expect(state.betting).toEqual({ level: 0, bets: 0, toAct: [BORIS, VERA, GLEB, ANA] });
+    expect(state.betting).toEqual({ level: 0, minRaise: 30, toAct: [BORIS, VERA, GLEB, ANA] });
 
     state = play(state, FINAL_BETS);
     expect(state.phase).toBe('reveal');
     expect(state.finalPot).toBe(268);
+    expect(state.players.map((p) => p.roundCommitted)).toEqual([90, 90, 30, 30]);
 
     const { state: done, events } = ok(step(state, advance));
     expect(done.phase).toBe('done');
     expect(done.final).toMatchObject({
       reason: 'showdown',
       pot: 268,
+      pots: [{ amount: 268, eligible: [ANA, BORIS], winners: [BORIS] }],
       winners: [BORIS],
       payouts: [0, 268, 0, 0],
     });
@@ -130,27 +141,32 @@ describe('a full hand (spec appendix)', () => {
       { seat: BORIS, cards: cards('3E 10F 12W 5F') },
     ]);
     expect(done.final?.combinations).toEqual([
-      { seat: ANA, combination: { category: 'flush', cards: cards('7F 6F 3F'), key: [2, 7, 6, 3] } },
-      { seat: BORIS, combination: { category: 'flush', cards: cards('10F 6F 5F'), key: [2, 10, 6, 5] } },
+      { seat: ANA, combination: { category: 'straight', cards: cards('13A 12E 11E'), key: [3, 13] } },
+      { seat: BORIS, combination: { category: 'three', cards: cards('10F 10A 10W'), key: [4, 10] } },
     ]);
     expect(done.players.map((p) => p.stack - STACK)).toEqual([-100, 168, -28, -40]);
     expect(done.finalPot).toBe(0);
     expect(events).toEqual([{ type: 'handEnded', result: done.final }]);
   });
 
-  it('caps the betting at three bets', () => {
-    const state = play(appendix(), [
-      ...ROUND1,
-      advance,
-      ...bets([
-        [BORIS, 'bet'],
-        [VERA, 'raise'],
-        [GLEB, 'raise'],
-      ]),
+  it('records every bet with the chips it cost', () => {
+    let state = play(appendix(), [...ROUND1, advance]);
+    const seen: HandEvent[] = [];
+    for (const action of FINAL_BETS) {
+      const result = ok(step(state, action));
+      seen.push(...result.events);
+      state = result.state;
+    }
+    expect(seen).toEqual([
+      { type: 'betPlaced', seat: BORIS, kind: 'raise', amount: 30, allIn: false },
+      { type: 'betPlaced', seat: VERA, kind: 'call', amount: 30, allIn: false },
+      { type: 'betPlaced', seat: GLEB, kind: 'call', amount: 30, allIn: false },
+      { type: 'betPlaced', seat: ANA, kind: 'raise', amount: 60, allIn: false },
+      { type: 'betPlaced', seat: BORIS, kind: 'raise', amount: 60, allIn: false },
+      { type: 'betPlaced', seat: VERA, kind: 'fold', amount: 0, allIn: false },
+      { type: 'betPlaced', seat: GLEB, kind: 'fold', amount: 0, allIn: false },
+      { type: 'betPlaced', seat: ANA, kind: 'call', amount: 30, allIn: false },
     ]);
-    expect(legalBets(state, ANA)).toEqual(['fold', 'call']);
-    expect(step(state, { type: 'bet', seat: ANA, kind: 'raise' })).toEqual({ ok: false, reason: 'illegal_bet' });
-    expect(step(state, { type: 'bet', seat: BORIS, kind: 'call' })).toEqual({ ok: false, reason: 'not_your_turn' });
   });
 });
 
@@ -158,11 +174,18 @@ describe('startHand', () => {
   it('rejects too few players, a short deck and a short stack', () => {
     const deck = stackedDeck([1, 2, 0], [], [], [], []);
     expect(startHand(DEFAULT_RULES, seats(2), 0, deck)).toEqual({ ok: false, reason: 'not_enough_players' });
-    expect(startHand(DEFAULT_RULES, seats(3), 0, deck.slice(0, 16))).toEqual({ ok: false, reason: 'deck_too_small' });
+    expect(startHand(DEFAULT_RULES, seats(3), 0, deck.slice(0, 14))).toEqual({ ok: false, reason: 'deck_too_small' });
+    expect(startHand(DEFAULT_RULES, seats(3), 0, deck.slice(0, 15)).ok).toBe(true);
     expect(startHand(DEFAULT_RULES, [...seats(2), { id: 'poor', stack: 9 }], 0, deck)).toEqual({
       ok: false,
       reason: 'insufficient_stack',
     });
+  });
+
+  it('marks a seat whose ante took its last chip as all-in', () => {
+    const state = play(appendix([STACK, 10, STACK, STACK]), [...ROUND1, advance]);
+    expect(state.players[BORIS]).toMatchObject({ stack: 0, allIn: true, committed: 10 });
+    expect(state.betting?.toAct).toEqual([VERA, GLEB, ANA]);
   });
 });
 
@@ -173,7 +196,7 @@ describe('step', () => {
     expect(step(state, stay(BORIS, '10F'))).toEqual({ ok: false, reason: 'already_decided' });
     expect(step(state, stay(VERA, '2F'))).toEqual({ ok: false, reason: 'card_not_in_hand' });
     expect(step(state, stay(VERA, '9W'))).toEqual({ ok: false, reason: 'card_not_in_hand' });
-    expect(step(state, { type: 'bet', seat: VERA, kind: 'check' })).toEqual({ ok: false, reason: 'wrong_phase' });
+    expect(step(state, check(VERA))).toEqual({ ok: false, reason: 'wrong_phase' });
     expect(step(state, advance)).toEqual({ ok: false, reason: 'wrong_phase' });
     expect(step(state, skip(7))).toEqual({ ok: false, reason: 'unknown_seat' });
   });
@@ -222,10 +245,10 @@ describe('step', () => {
     expect(events.map((e) => e.type)).toEqual(['round1Resolved']);
   });
 
-  it('opens the Final straight into betting: 3 table cards, 4 cards in every hand', () => {
+  it('opens the Final straight into betting: the Round 1 pair plus one card, 4 cards in every hand', () => {
     const state = play(appendix(), [...ROUND1, advance]);
     expect(state.phase).toBe('bet');
-    expect(state.table).toHaveLength(3);
+    expect(state.table).toEqual(cards('10A 11E 10W'));
     expect(state.players.map((p) => p.hand.length)).toEqual([4, 4, 4, 4]);
     expect(state.betting?.toAct).toEqual([BORIS, VERA, GLEB, ANA]);
     expect(step(state, skip(BORIS))).toEqual({ ok: false, reason: 'wrong_phase' });
@@ -234,35 +257,86 @@ describe('step', () => {
     expect(step(play(appendix(), ROUND1), timeout)).toEqual({ ok: false, reason: 'wrong_phase' });
   });
 
+  it('rejects a bet out of turn, a check facing a bet and a call with nothing to call', () => {
+    const state = play(appendix(), [...ROUND1, advance]);
+    expect(step(state, check(VERA))).toEqual({ ok: false, reason: 'not_your_turn' });
+    expect(step(state, call(BORIS))).toEqual({ ok: false, reason: 'illegal_bet' });
+    expect(step(state, bet(9, { kind: 'check' }))).toEqual({ ok: false, reason: 'unknown_seat' });
+    const opened = play(state, [raise(BORIS, 30)]);
+    expect(step(opened, check(VERA))).toEqual({ ok: false, reason: 'illegal_bet' });
+  });
+
+  it('rejects a raise below the minimum, at or below the level, or beyond the stack', () => {
+    const state = play(appendix(), [...ROUND1, advance]);
+    expect(step(state, raise(BORIS, 0))).toEqual({ ok: false, reason: 'bad_raise_size' });
+    expect(step(state, raise(BORIS, 20))).toEqual({ ok: false, reason: 'bad_raise_size' });
+    expect(step(state, raise(BORIS, 991))).toEqual({ ok: false, reason: 'insufficient_stack' });
+    expect(step(state, raise(BORIS, 30)).ok).toBe(true);
+    expect(step(state, raise(BORIS, 990)).ok).toBe(true);
+
+    const opened = play(state, [raise(BORIS, 30)]);
+    expect(step(opened, raise(VERA, 30))).toEqual({ ok: false, reason: 'bad_raise_size' });
+    expect(step(opened, raise(VERA, 50))).toEqual({ ok: false, reason: 'bad_raise_size' });
+    expect(step(opened, raise(VERA, 60)).ok).toBe(true);
+
+    // After a raise of 70 the next raise must add at least 70.
+    const reraised = play(opened, [raise(VERA, 100)]);
+    expect(reraised.betting).toEqual({ level: 100, minRaise: 70, toAct: [GLEB, ANA, BORIS] });
+    expect(step(reraised, raise(GLEB, 160))).toEqual({ ok: false, reason: 'bad_raise_size' });
+    expect(step(reraised, raise(GLEB, 170)).ok).toBe(true);
+  });
+
+  it('allows an all-in raise below the minimum, which raises the level without reopening the action', () => {
+    // Vera sits down with 48: 38 after the ante, 50 after her Round 1 win.
+    const state = play(appendix([STACK, STACK, 48, STACK]), [...ROUND1, advance, raise(BORIS, 30)]);
+    expect(betOptions(state, VERA)).toEqual({ canCheck: false, call: 30, callAllIn: false, raise: { min: 50, max: 50 } });
+    expect(step(state, raise(VERA, 40))).toEqual({ ok: false, reason: 'bad_raise_size' });
+    const { state: shoved, events } = ok(step(state, raise(VERA, 50)));
+    expect(events).toEqual([{ type: 'betPlaced', seat: VERA, kind: 'raise', amount: 50, allIn: true }]);
+    expect(shoved.players[VERA]).toMatchObject({ stack: 0, allIn: true, roundCommitted: 50 });
+    expect(shoved.betting).toEqual({ level: 50, minRaise: 30, toAct: [GLEB, ANA] });
+
+    const done = play(shoved, [call(GLEB), call(ANA), advance]);
+    expect(done.players[BORIS]?.roundCommitted).toBe(30);
+    expect(done.final?.pots).toEqual([
+      { amount: 148, eligible: [ANA, BORIS, VERA, GLEB], winners: [BORIS] },
+      { amount: 60, eligible: [ANA, VERA, GLEB], winners: [ANA] },
+    ]);
+    expect(done.final?.winners).toEqual([ANA, BORIS]);
+    expect(done.final?.payouts).toEqual([60, 148, 0, 0]);
+  });
+
+  it('lets a short stack call for less and go all-in', () => {
+    // Vera sits down with 18: 8 after the ante, 20 after her Round 1 win.
+    const state = play(appendix([STACK, STACK, 18, STACK]), [...ROUND1, advance, raise(BORIS, 30)]);
+    expect(betOptions(state, VERA)).toEqual({ canCheck: false, call: 20, callAllIn: true, raise: null });
+    expect(step(state, raise(VERA, 31))).toEqual({ ok: false, reason: 'insufficient_stack' });
+    const { state: called, events } = ok(step(state, call(VERA)));
+    expect(events).toEqual([{ type: 'betPlaced', seat: VERA, kind: 'call', amount: 20, allIn: true }]);
+    expect(called.players[VERA]).toMatchObject({ stack: 0, allIn: true, roundCommitted: 20 });
+    expect(called.betting).toEqual({ level: 30, minRaise: 30, toAct: [GLEB, ANA] });
+  });
+
   it('checks on timeout when possible, otherwise folds', () => {
     let state = play(appendix(), [...ROUND1, advance, timeout]);
     expect(state.players[BORIS]?.folded).toBe(false);
     expect(state.betting?.toAct).toEqual([VERA, GLEB, ANA]);
-    state = play(state, [...bets([[VERA, 'bet']]), timeout]);
+    state = play(state, [raise(VERA, 30), timeout]);
     expect(state.players[GLEB]?.folded).toBe(true);
     expect(state.players[GLEB]?.hand).toEqual(cards('2F 11A 5W 8W'));
+    expect(state.betting?.toAct).toEqual([ANA, BORIS]);
   });
 
   it('ends the hand at once when everyone else folds, revealing nothing', () => {
     const { state, events } = ok(
-      step(
-        play(appendix(), [
-          ...ROUND1,
-          advance,
-          ...bets([
-            [BORIS, 'bet'],
-            [VERA, 'fold'],
-            [GLEB, 'fold'],
-          ]),
-        ]),
-        { type: 'bet', seat: ANA, kind: 'fold' },
-      ),
+      step(play(appendix(), [...ROUND1, advance, raise(BORIS, 30), fold(VERA), fold(GLEB)]), fold(ANA)),
     );
     expect(state.phase).toBe('done');
     expect(state.final).toEqual({
       reason: 'fold',
-      table: cards('3F 6F 9E'),
+      table: cards('10A 11E 10W'),
       pot: 58,
+      pots: [{ amount: 58, eligible: [BORIS], winners: [BORIS] }],
       hands: [],
       combinations: [],
       winners: [BORIS],
@@ -276,23 +350,12 @@ describe('step', () => {
     const deck = stackedDeck(
       [1, 2, 0],
       [cards('1W 2A 9E'), cards('4W 8A 13E'), cards('1A 3W 10E')],
-      cards('11A 12W'),
+      cards('5F 6F'),
       [cards('2E'), cards('6E'), cards('7A')],
-      cards('5F 6F 7F'),
+      cards('7F'),
     );
     const start = ok(startHand(DEFAULT_RULES, seats(3), 0, deck)).state;
-    const state = play(start, [
-      skip(0),
-      skip(1),
-      skip(2),
-      advance,
-      ...bets([
-        [1, 'check'],
-        [2, 'check'],
-        [0, 'check'],
-      ]),
-      advance,
-    ]);
+    const state = play(start, [skip(0), skip(1), skip(2), advance, check(1), check(2), check(0), advance]);
     expect(state.final?.hands).toEqual([
       { seat: 0, cards: cards('1W 2A 9E 2E') },
       { seat: 1, cards: cards('4W 8A 13E 6E') },
@@ -301,6 +364,7 @@ describe('step', () => {
     for (const entry of state.final?.combinations ?? []) {
       expect(entry.combination).toEqual({ category: 'straightFlush', cards: cards('7F 6F 5F'), key: [5, 7] });
     }
+    expect(state.final?.pots).toEqual([{ amount: 30, eligible: [0, 1, 2], winners: [0, 1, 2] }]);
     expect(state.final?.winners).toEqual([0, 1, 2]);
     expect(state.final?.payouts).toEqual([10, 10, 10]);
   });
@@ -311,7 +375,7 @@ describe('step', () => {
       [cards('5A 1F 2W'), cards('5W 1A 2F'), cards('5E 1W 2A')],
       cards('10A 11E'),
       [cards('3F'), cards('3W'), cards('4E')],
-      cards('12F 13W 8E'),
+      cards('13F'),
     );
     const start = ok(startHand(DEFAULT_RULES, seats(3), 0, deck)).state;
     expect(start.round1Pot).toBe(9);
@@ -324,30 +388,93 @@ describe('step', () => {
     expect(state.round1?.winners).toEqual([0, 1, 2]);
     expect(state.round1?.payouts).toEqual([3, 3, 3]);
 
-    const done = play(state, [
-      advance,
-      ...bets([
-        [1, 'check'],
-        [2, 'check'],
-        [0, 'check'],
-      ]),
-      advance,
-    ]);
+    const done = play(state, [advance, check(1), check(2), check(0), advance]);
     expect(done.final?.combinations.map((c) => c.combination.category)).toEqual(['straight', 'straight', 'flush']);
     expect(done.final?.winners).toEqual([0, 1]);
     expect(done.final?.pot).toBe(21);
     expect(done.final?.payouts).toEqual([10, 11, 0]);
   });
 
+  describe('side pots at stacks 50 / 200 / 1000', () => {
+    // Button 0. Seat 1 (50) holds three 10s, seat 2 (200) a 13-high straight, seat 0 (1000) a 6-high straight.
+    function start(): HandState {
+      const deck = stackedDeck(
+        [1, 2, 0],
+        [cards('3F 4W 11A'), cards('10F 10W 1A'), cards('12W 13E 2F')],
+        cards('10A 11E'),
+        [cards('6E'), cards('7E'), cards('8E')],
+        cards('5A'),
+      );
+      const stakes = [
+        { id: 'big', stack: 1000 },
+        { id: 'short', stack: 50 },
+        { id: 'middle', stack: 200 },
+      ];
+      return play(ok(startHand(DEFAULT_RULES, stakes, 0, deck)).state, [skip(0), skip(1), skip(2), advance]);
+    }
+
+    it('pays the shortest stack only the main pot and the middle stack the side pot', () => {
+      let state = play(start(), [raise(1, 40)]);
+      expect(state.players[1]).toMatchObject({ stack: 0, allIn: true });
+      expect(state.betting).toEqual({ level: 40, minRaise: 40, toAct: [2, 0] });
+      state = play(state, [raise(2, 190)]);
+      expect(state.betting).toEqual({ level: 190, minRaise: 150, toAct: [0] });
+      expect(betOptions(state, 0)).toEqual({ canCheck: false, call: 190, callAllIn: false, raise: { min: 340, max: 990 } });
+      state = play(state, [call(0)]);
+      expect(state.phase).toBe('reveal');
+      expect(state.finalPot).toBe(450);
+
+      const done = play(state, [advance]);
+      expect(done.final?.combinations).toEqual([
+        { seat: 0, combination: { category: 'straight', cards: cards('6E 5A 4W'), key: [3, 6] } },
+        { seat: 1, combination: { category: 'three', cards: cards('10F 10W 10A'), key: [4, 10] } },
+        { seat: 2, combination: { category: 'straight', cards: cards('13E 12W 11E'), key: [3, 13] } },
+      ]);
+      expect(done.final?.pots).toEqual([
+        { amount: 150, eligible: [0, 1, 2], winners: [1] },
+        { amount: 300, eligible: [0, 2], winners: [2] },
+      ]);
+      expect(done.final).toMatchObject({ pot: 450, winners: [1, 2], payouts: [0, 150, 300] });
+      expect(done.players.map((p) => p.stack)).toEqual([800, 150, 300]);
+      expect(chips(done)).toBe(1250);
+    });
+
+    it('ends the betting when everyone else is all-in and returns an uncontested side pot', () => {
+      const state = play(start(), [raise(1, 40), raise(2, 190), fold(0)]);
+      expect(state.phase).toBe('reveal');
+      const done = play(state, [advance]);
+      expect(done.final?.pots).toEqual([
+        { amount: 110, eligible: [1, 2], winners: [1] },
+        { amount: 150, eligible: [2], winners: [2] },
+      ]);
+      expect(done.final?.payouts).toEqual([0, 110, 150]);
+      expect(done.players.map((p) => p.stack)).toEqual([990, 110, 150]);
+      expect(chips(done)).toBe(1250);
+    });
+
+    it('stops at once when the last seat able to act calls an all-in', () => {
+      const state = play(start(), [check(1), check(2), raise(0, 990), fold(1), call(2)]);
+      expect(state.phase).toBe('reveal');
+      expect(state.players[2]).toMatchObject({ stack: 0, allIn: true, roundCommitted: 190 });
+      const done = play(state, [advance]);
+      expect(done.final?.pots).toEqual([
+        { amount: 410, eligible: [0, 2], winners: [2] },
+        { amount: 800, eligible: [0], winners: [0] },
+      ]);
+      expect(done.players.map((p) => p.stack)).toEqual([800, 40, 410]);
+    });
+  });
+
   it('conserves chips and pays out exactly the pot', () => {
     const start = appendix();
     const total = chips(start);
     expect(total).toBe(4 * STACK);
-    const state = play(start, [...ROUND1, advance, ...bets([[BORIS, 'bet']]), timeout, timeout, timeout]);
+    const state = play(start, [...ROUND1, advance, raise(BORIS, 30), timeout, timeout, timeout]);
     expect(state.phase).toBe('done');
     expect(chips(state)).toBe(total);
     expect(state.round1?.payouts.reduce((a, b) => a + b, 0)).toBe(state.round1?.pot);
     expect(state.final?.payouts.reduce((a, b) => a + b, 0)).toBe(state.final?.pot);
+    expect(state.final?.pots.reduce((a, b) => a + b.amount, 0)).toBe(state.final?.pot);
   });
 
   it('never mutates its input', () => {
@@ -359,7 +486,7 @@ describe('step', () => {
     expect(JSON.stringify(state)).toBe(frozen);
     const later = play(state, [timeout, advance]);
     const laterFrozen = JSON.stringify(later);
-    ok(step(later, { type: 'bet', seat: BORIS, kind: 'bet' }));
+    ok(step(later, raise(BORIS, 30)));
     ok(step(later, timeout));
     expect(JSON.stringify(later)).toBe(laterFrozen);
   });
@@ -367,9 +494,21 @@ describe('step', () => {
 
 describe('helpers', () => {
   it('orders active seats clockwise from the start seat', () => {
-    const state = play(appendix(), [...ROUND1, advance, ...bets([[BORIS, 'bet'], [VERA, 'fold']])]);
+    const state = play(appendix(), [...ROUND1, advance, raise(BORIS, 30), fold(VERA)]);
     expect(activeOrder(state, GLEB)).toEqual([GLEB, ANA, BORIS]);
     expect(activeOrder(state, 0)).toEqual([ANA, BORIS, GLEB]);
+  });
+
+  it('offers bet options only to the seat to act', () => {
+    const state = play(appendix(), [...ROUND1, advance]);
+    expect(betOptions(state, BORIS)).toEqual({ canCheck: true, call: 0, callAllIn: false, raise: { min: 30, max: 990 } });
+    expect(betOptions(state, VERA)).toBeNull();
+    expect(betOptions(state, 9)).toBeNull();
+    expect(betOptions(play(appendix(), ROUND1), BORIS)).toBeNull();
+    const opened = play(state, [raise(BORIS, 30)]);
+    // Vera's Round 1 win of 12 is in her stack: 990 + 12.
+    expect(betOptions(opened, VERA)).toEqual({ canCheck: false, call: 30, callAllIn: false, raise: { min: 60, max: 1002 } });
+    expect(betOptions(opened, BORIS)).toBeNull();
   });
 });
 
@@ -381,7 +520,8 @@ describe('viewFor', () => {
     expect(view.you?.canDecide).toBe(true);
     expect(view.you?.options.map((o) => o.combination.category)).toEqual(['high', 'straight', 'high']);
     expect(view.you?.best).toBeNull();
-    expect(view.players[BORIS]).toMatchObject({ decided: true, stayed: null, shown: null, handCount: 3 });
+    expect(view.you?.bet).toBeNull();
+    expect(view.players[BORIS]).toMatchObject({ decided: true, stayed: null, shown: null, handCount: 3, allIn: false });
     expect(view.players[VERA]).toMatchObject({ decided: false, stayed: null, shown: null, handCount: 3 });
     const json = JSON.stringify(view);
     for (const other of [BORIS, VERA, GLEB]) {
@@ -404,24 +544,36 @@ describe('viewFor', () => {
     expect(JSON.stringify(view)).not.toContain(JSON.stringify(card('10F')));
   });
 
-  it('gives each seat its own best in the Final and lists legal bets for the actor', () => {
+  it('gives each seat its own best in the Final and bet options to the actor only', () => {
     const state = play(appendix(), [...ROUND1, advance]);
     const ana = viewFor(state, ANA);
     expect(ana.you?.hand).toEqual(cards('7F 12E 13A 1W'));
     expect(ana.you?.options).toEqual([]);
-    expect(ana.you?.best).toEqual({ category: 'flush', cards: cards('7F 6F 3F'), key: [2, 7, 6, 3] });
-    expect(ana.you?.legalBets).toEqual([]);
-    expect(ana.betting).toEqual({ level: 0, bets: 0, cap: 3, unit: 30, actor: BORIS });
-    expect(viewFor(state, BORIS).you?.legalBets).toEqual(['check', 'bet']);
-    expect(viewFor(state, BORIS).you?.best).toMatchObject({ category: 'flush', key: [2, 10, 6, 5] });
+    expect(ana.you?.best).toEqual({ category: 'straight', cards: cards('13A 12E 11E'), key: [3, 13] });
+    expect(ana.you?.bet).toBeNull();
+    expect(ana.betting).toEqual({ level: 0, minRaise: 30, actor: BORIS });
+    expect(viewFor(state, BORIS).you?.bet).toEqual({ canCheck: true, call: 0, callAllIn: false, raise: { min: 30, max: 990 } });
+    expect(viewFor(state, BORIS).you?.best).toMatchObject({ category: 'three', key: [4, 10] });
     expect(JSON.stringify(ana)).not.toContain(JSON.stringify(card('10F')));
   });
 
-  it('keeps a folded player\'s best and reveals other hands only through final.hands', () => {
+  it('caps the call by the stack and drops the raise when the stack cannot exceed the level', () => {
+    // Vera holds exactly 30 once her Round 1 win is in; Gleb 40.
+    const state = play(appendix([STACK, STACK, 28, 50]), [...ROUND1, advance, raise(BORIS, 30)]);
+    expect(viewFor(state, VERA).you?.bet).toEqual({ canCheck: false, call: 30, callAllIn: true, raise: null });
+    expect(viewFor(state, VERA).betting).toEqual({ level: 30, minRaise: 30, actor: VERA });
+    const next = play(state, [call(VERA)]);
+    expect(viewFor(next, VERA).players[VERA]).toMatchObject({ stack: 0, allIn: true, roundCommitted: 30 });
+    expect(viewFor(next, GLEB).you?.bet).toEqual({ canCheck: false, call: 30, callAllIn: false, raise: { min: 40, max: 40 } });
+    expect(viewFor(next, VERA).you?.bet).toBeNull();
+  });
+
+  it("keeps a folded player's best and reveals other hands only through final.hands", () => {
     const state = play(appendix(), [...ROUND1, advance, ...FINAL_BETS]);
     const vera = viewFor(state, VERA);
     expect(vera.players[VERA]?.folded).toBe(true);
-    expect(vera.you?.best).toMatchObject({ category: 'pair', cards: cards('13E 9A 9E'), key: [1, 9, 13] });
+    expect(vera.you?.best).toMatchObject({ category: 'straight', cards: cards('11E 10A 9A'), key: [3, 11] });
+    expect(vera.betting).toBeNull();
     expect(JSON.stringify(vera)).not.toContain(JSON.stringify(card('10F')));
 
     const done = play(state, [advance]);

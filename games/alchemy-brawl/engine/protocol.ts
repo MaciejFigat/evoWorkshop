@@ -4,6 +4,7 @@ import { ELEMENTS, MAX_POWER, MIN_POWER, type Card } from './cards.ts';
 import { MAX_PLAYERS, MIN_PLAYERS } from './config.ts';
 import {
   CATEGORIES,
+  type BetAction,
   type BetKind,
   type Combination,
   type Decision,
@@ -40,7 +41,14 @@ export type ServerError =
   | 'not_seated'
   | 'not_in_hand';
 
-export const BET_KINDS = ['check', 'bet', 'call', 'raise', 'fold'] as const satisfies readonly BetKind[];
+export const BET_KINDS = ['fold', 'check', 'call', 'raise'] as const satisfies readonly BetKind[];
+
+const BetActionSchema: z.ZodType<BetAction> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('fold') }),
+  z.object({ kind: z.literal('check') }),
+  z.object({ kind: z.literal('call') }),
+  z.object({ kind: z.literal('raise'), to: z.number().int().positive() }),
+]);
 
 const SERVER_ERRORS = [
   'not_enough_players',
@@ -52,6 +60,7 @@ const SERVER_ERRORS = [
   'card_not_in_hand',
   'not_your_turn',
   'illegal_bet',
+  'bad_raise_size',
   'insufficient_stack',
   'invalid_message',
   'not_identified',
@@ -98,6 +107,7 @@ const FinalResultSchema: z.ZodType<FinalResult> = z.object({
   reason: z.enum(['fold', 'showdown']),
   table: z.array(CardSchema),
   pot: z.number().int(),
+  pots: z.array(z.object({ amount: z.number().int(), eligible: z.array(z.number().int()), winners: z.array(z.number().int()) })),
   hands: z.array(SeatCardsSchema),
   combinations: z.array(SeatCombinationSchema),
   winners: z.array(z.number().int()),
@@ -109,7 +119,7 @@ const HandEventSchema: z.ZodType<HandEvent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('decisionLocked'), seat: z.number().int() }),
   z.object({ type: z.literal('round1Resolved'), result: Round1ResultSchema }),
   z.object({ type: z.literal('finalStarted'), table: z.array(CardSchema) }),
-  z.object({ type: z.literal('betPlaced'), seat: z.number().int(), kind: z.enum(BET_KINDS), amount: z.number().int() }),
+  z.object({ type: z.literal('betPlaced'), seat: z.number().int(), kind: z.enum(BET_KINDS), amount: z.number().int(), allIn: z.boolean() }),
   z.object({ type: z.literal('handEnded'), result: FinalResultSchema }),
 ]);
 
@@ -129,6 +139,7 @@ const HandViewSchema: z.ZodType<HandView> = z.object({
       stayed: z.boolean().nullable(),
       shown: CardSchema.nullable(),
       folded: z.boolean(),
+      allIn: z.boolean(),
       committed: z.number().int(),
       roundCommitted: z.number().int(),
     }),
@@ -136,9 +147,7 @@ const HandViewSchema: z.ZodType<HandView> = z.object({
   betting: z
     .object({
       level: z.number().int(),
-      bets: z.number().int(),
-      cap: z.number().int(),
-      unit: z.number().int(),
+      minRaise: z.number().int(),
       actor: z.number().int().nullable(),
     })
     .nullable(),
@@ -150,7 +159,14 @@ const HandViewSchema: z.ZodType<HandView> = z.object({
       hand: z.array(CardSchema),
       decision: DecisionSchema.nullable(),
       canDecide: z.boolean(),
-      legalBets: z.array(z.enum(BET_KINDS)),
+      bet: z
+        .object({
+          canCheck: z.boolean(),
+          call: z.number().int(),
+          callAllIn: z.boolean(),
+          raise: z.object({ min: z.number().int(), max: z.number().int() }).nullable(),
+        })
+        .nullable(),
       options: z.array(z.object({ card: CardSchema, combination: CombinationSchema })),
       best: CombinationSchema.nullable(),
     })
@@ -189,7 +205,7 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('leave') }),
   z.object({ type: z.literal('addBot') }),
   z.object({ type: z.literal('decide'), decision: DecisionSchema }),
-  z.object({ type: z.literal('bet'), kind: z.enum(BET_KINDS) }),
+  z.object({ type: z.literal('bet'), action: BetActionSchema }),
   z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(200) }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;

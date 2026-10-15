@@ -1,4 +1,4 @@
-import type { Card, Category, Combination, FinalResult, HandEvent, HandView, Round1Result, SeatCombination, TableView } from '@evo/alchemy-brawl/engine';
+import type { Card, Category, Combination, FinalResult, HandView, Round1Result, TableView } from '@evo/alchemy-brawl/engine';
 
 export type NameOf = (seat: number) => string;
 
@@ -89,28 +89,4 @@ export function finalText(result: FinalResult, nameOf: NameOf): string {
     .map((entry) => `${nameOf(entry.seat)}: ${describeCombination(entry.combination)}`)
     .join(' · ');
   return `${combos}. ${result.winners.length > 1 ? 'Split: ' : ''}${winners}.`;
-}
-
-// One History line per settled round: 'Hand 3 · Bot 2 +291 · fire straight flush'.
-export function historyLine(handNo: number, event: HandEvent, nameOf: NameOf): string | null {
-  if (event.type === 'round1Resolved') {
-    const result = event.result;
-    if (result.rolledOver) {
-      return `Hand ${handNo} · Round 1 · nobody stayed, ${result.pot} rolls over`;
-    }
-    const winners = list(result.winners.map((seat) => `${nameOf(seat)} +${result.payouts[seat] ?? 0}`));
-    return `Hand ${handNo} · Round 1 · ${winners} · ${winningCombination(result.combinations, result.winners) ?? 'unopposed'}`;
-  }
-  if (event.type === 'handEnded') {
-    const result = event.result;
-    const winners = list(result.winners.map((seat) => `${nameOf(seat)} +${result.payouts[seat] ?? 0}`));
-    return `Hand ${handNo} · ${winners} · ${winningCombination(result.combinations, result.winners) ?? 'everyone else folded'}`;
-  }
-  return null;
-}
-
-function winningCombination(combinations: SeatCombination[], winners: number[]): string | null {
-  const [first] = winners;
-  const entry = combinations.find((candidate) => candidate.seat === first);
-  return entry === undefined ? null : describeCombination(entry.combination);
 }

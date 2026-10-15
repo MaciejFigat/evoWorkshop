@@ -1,7 +1,8 @@
 import {
   CATEGORY_RANK,
   compareCombinations,
-  type BetKind,
+  type BetAction,
+  type BetOptions,
   type Card,
   type CardOption,
   type Decision,
@@ -10,12 +11,14 @@ import {
 } from '@evo/alchemy-brawl/engine';
 import type { Rng } from '@evo/rng';
 
-export type BotMove = { type: 'decide'; decision: Decision } | { type: 'bet'; kind: BetKind };
+export type BotMove = { type: 'decide'; decision: Decision } | { type: 'bet'; action: BetAction };
 
 const BLUFF_STAY_RATE = 0.2;
-const MEDIUM_BET_RATE = 0.5;
-const MEDIUM_FOLD_RATE = 0.15;
+const MEDIUM_RAISE_RATE = 0.3;
+const MEDIUM_FOLD_RATE = 0.3;
+const MEDIUM_CALL_SHARE = 0.2;
 const WEAK_CALL_RATE = 0.3;
+const WEAK_CALL_SHARE = 0.1;
 
 // Sees exactly what a human in the same seat sees: the bot plays from the view, never from hand state.
 export function chooseBotMove(view: HandView, rng: Rng): BotMove | null {
@@ -26,8 +29,9 @@ export function chooseBotMove(view: HandView, rng: Rng): BotMove | null {
   if (you.canDecide) {
     return { type: 'decide', decision: decide(you, rng) };
   }
-  if (you.legalBets.length > 0) {
-    return bet(you, rng);
+  if (you.bet !== null) {
+    const spot: Spot = { stack: view.players[you.seat]?.stack ?? 0, level: view.betting?.level ?? 0, pot: view.finalPot };
+    return { type: 'bet', action: bet(you, you.bet, spot, rng) };
   }
   return null;
 }
@@ -46,30 +50,33 @@ function decide(you: YouView, rng: Rng): Decision {
   return { kind: 'skip' };
 }
 
+type Spot = { stack: number; level: number; pot: number };
+
 // The Final: strength is the best three among the hand and the table, as the showdown scores it.
-function bet(you: YouView, rng: Rng): BotMove | null {
-  const legal = you.legalBets;
+// A strong hand raises the pot, a medium one raises the minimum now and then and calls cheap
+// bets, a weak one checks or folds. The options already cap every amount by the stack.
+function bet(you: YouView, options: BetOptions, spot: Spot, rng: Rng): BetAction {
   const strength = you.best === null ? CATEGORY_RANK.high : CATEGORY_RANK[you.best.category];
-  const pick = (...preferred: BetKind[]): BotMove | null => {
-    const kind = preferred.find((k) => legal.includes(k));
-    return kind === undefined ? null : { type: 'bet', kind };
-  };
+  const stayIn: BetAction = options.canCheck ? { kind: 'check' } : { kind: 'call' };
   if (strength >= CATEGORY_RANK.straight) {
-    return pick('raise', 'bet', 'call', 'check');
+    if (options.raise !== null) {
+      return { kind: 'raise', to: Math.min(options.raise.max, Math.max(options.raise.min, spot.level + spot.pot)) };
+    }
+    return stayIn;
   }
   if (strength >= CATEGORY_RANK.pair) {
-    if (legal.includes('bet') && rng.next() < MEDIUM_BET_RATE) {
-      return pick('bet');
+    if (options.raise !== null && rng.next() < MEDIUM_RAISE_RATE) {
+      return { kind: 'raise', to: options.raise.min };
     }
-    if (legal.includes('call') && rng.next() < MEDIUM_FOLD_RATE) {
-      return pick('fold');
+    if (options.canCheck || options.call <= spot.stack * MEDIUM_CALL_SHARE) {
+      return stayIn;
     }
-    return pick('call', 'check');
+    return rng.next() < MEDIUM_FOLD_RATE ? { kind: 'fold' } : { kind: 'call' };
   }
-  if (legal.includes('check')) {
-    return pick('check');
+  if (options.canCheck) {
+    return { kind: 'check' };
   }
-  return rng.next() < WEAK_CALL_RATE ? pick('call') : pick('fold');
+  return options.call <= spot.stack * WEAK_CALL_SHARE && rng.next() < WEAK_CALL_RATE ? { kind: 'call' } : { kind: 'fold' };
 }
 
 function bestOption(options: CardOption[]): CardOption | null {

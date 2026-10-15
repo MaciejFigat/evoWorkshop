@@ -1,6 +1,7 @@
 import {
   DEFAULT_TABLE,
   parseServerMessage,
+  rebuyBelow,
   type HandEvent,
   type ServerMessage,
   type TableView,
@@ -134,9 +135,21 @@ describe('Lobby', () => {
     for (const event of ended) {
       expect(event.result.payouts).toHaveLength(3);
       expect(event.result.payouts.reduce((sum, p) => sum + p, 0)).toBe(event.result.pot);
+      expect(event.result.pots.reduce((sum, p) => sum + p.amount, 0)).toBe(event.result.pot);
+      for (const pot of event.result.pots) {
+        expect(pot.winners.length).toBeGreaterThan(0);
+        expect(pot.winners.every((seat) => pot.eligible.includes(seat))).toBe(true);
+      }
       expect(event.result.hands).toHaveLength(event.result.reason === 'fold' ? 0 : event.result.combinations.length);
     }
     expect(ended.some((e) => e.result.reason === 'showdown')).toBe(true);
+    // Every stack goes on through the table: nobody is ever below rebuyBelow when a hand starts.
+    const started = a.inbox.flatMap((m) => (m.type === 'table' && m.events.some((e) => e.type === 'round1Started') ? [m.view] : []));
+    for (const view of started) {
+      for (const player of view.hand?.players ?? []) {
+        expect(player.stack + player.committed).toBeGreaterThanOrEqual(rebuyBelow(DEFAULT_TABLE.rules));
+      }
+    }
     // Hands come out only in the showdown and only for the seats that did not fold.
     const views = a.inbox.flatMap((m) => (m.type === 'table' && m.events.some((e) => e.type === 'handEnded') ? [m.view] : []));
     for (const view of views) {
@@ -248,8 +261,51 @@ describe('Lobby', () => {
     const a = soloTable(lobby);
     vi.advanceTimersByTime(START_DELAY_MS);
     expect(lastTable(a).hand?.phase).toBe('decide');
-    a.say({ type: 'bet', kind: 'check' });
+    a.say({ type: 'bet', action: { kind: 'check' } });
     expect(a.inbox.at(-1)).toEqual({ type: 'error', reason: 'wrong_phase' });
+  });
+
+  it('answers bad_raise_size to a raise below the minimum and takes a legal one', () => {
+    const lobby = new Lobby(DEFAULT_TABLE);
+    const a = client(lobby);
+    const b = client(lobby);
+    a.say(hello('token-aaaa', 'Ada'));
+    a.say({ type: 'create', maxPlayers: 3 });
+    const code = lastTable(a).code;
+    b.say(hello('token-bbbb', 'Ben'));
+    b.say({ type: 'join', code });
+    a.say({ type: 'addBot' });
+    // Nobody acts in Round 1; the first seat after the button (Ben) opens the Final.
+    vi.advanceTimersByTime(START_DELAY_MS + DEFAULT_TABLE.decideTimerMs + ROUND1_END_DELAY_MS);
+    const opened = lastTable(b);
+    expect(opened.hand?.phase).toBe('bet');
+    expect(opened.hand?.betting).toEqual({ level: 0, minRaise: DEFAULT_TABLE.rules.minBet, actor: opened.hand?.you?.seat });
+    expect(opened.hand?.you?.bet).toEqual({
+      canCheck: true,
+      call: 0,
+      callAllIn: false,
+      raise: { min: DEFAULT_TABLE.rules.minBet, max: DEFAULT_TABLE.buyIn - DEFAULT_TABLE.rules.ante },
+    });
+    b.say({ type: 'bet', action: { kind: 'raise', to: 0 } });
+    expect(b.inbox.at(-1)).toEqual({ type: 'error', reason: 'invalid_message' });
+    b.say({ type: 'bet', action: { kind: 'raise', to: DEFAULT_TABLE.rules.minBet - 1 } });
+    expect(b.inbox.at(-1)).toEqual({ type: 'error', reason: 'bad_raise_size' });
+    b.say({ type: 'bet', action: { kind: 'raise', to: DEFAULT_TABLE.buyIn } });
+    expect(b.inbox.at(-1)).toEqual({ type: 'error', reason: 'insufficient_stack' });
+    b.say({ type: 'bet', action: { kind: 'call' } });
+    expect(b.inbox.at(-1)).toEqual({ type: 'error', reason: 'illegal_bet' });
+    a.say({ type: 'bet', action: { kind: 'check' } });
+    expect(a.inbox.at(-1)).toEqual({ type: 'error', reason: 'not_your_turn' });
+    b.say({ type: 'bet', action: { kind: 'raise', to: 2 * DEFAULT_TABLE.rules.minBet } });
+    expect(b.inbox.at(-1)).toMatchObject({ type: 'table' });
+    expect(events(b).at(-1)).toEqual({
+      type: 'betPlaced',
+      seat: opened.hand?.you?.seat,
+      kind: 'raise',
+      amount: 2 * DEFAULT_TABLE.rules.minBet,
+      allIn: false,
+    });
+    expect(lastTable(b).hand?.betting).toMatchObject({ level: 2 * DEFAULT_TABLE.rules.minBet, minRaise: 2 * DEFAULT_TABLE.rules.minBet });
   });
 
   it('closes the table when the last human leaves', () => {

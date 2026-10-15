@@ -1,7 +1,11 @@
 import type { Card } from './cards.ts';
 import type { Rules } from './config.ts';
 
-export type BetKind = 'check' | 'bet' | 'call' | 'raise' | 'fold';
+// The Final is no-limit. A raise names the total the seat will have in this betting round
+// ('to'); a bet when nothing is in yet is a raise from 0. A call or raise that takes the whole
+// stack is an all-in, which can be short of the level or of the minimum raise.
+export type BetAction = { kind: 'fold' } | { kind: 'check' } | { kind: 'call' } | { kind: 'raise'; to: number };
+export type BetKind = BetAction['kind'];
 
 // Three-card poker categories, lowest first. A straight beats a flush (spec §5).
 export const CATEGORIES = ['high', 'pair', 'flush', 'straight', 'three', 'straightFlush'] as const;
@@ -26,11 +30,15 @@ export type HandPlayer = {
   // The card a Round 1 stayer turned face up; it stays in the hand and is public until the hand ends.
   shown: Card | null;
   folded: boolean;
+  // Stack is 0 while still in the hand: no more actions, eligible only for the pots contributed to.
+  allIn: boolean;
   committed: number;
   roundCommitted: number;
 };
 
-export type Betting = { level: number; bets: number; toAct: number[] };
+// level: the round commitment to match; minRaise: the smallest raise increment (the last raise
+// size, never below the minimum bet); toAct: seats still owed an action, in order.
+export type Betting = { level: number; minRaise: number; toAct: number[] };
 
 export type SeatCard = { seat: number; card: Card };
 export type SeatCards = { seat: number; cards: Card[] };
@@ -52,10 +60,15 @@ export type Round1Result = {
 
 // The Final plays every card: each remaining hand is shown at the showdown and its combination is
 // the best three cards among the hand and the table, as the board plays in poker.
+// One pot by contribution level: the main pot first, then each side pot; a seat is eligible for
+// every pot it contributed to.
+export type Pot = { amount: number; eligible: number[]; winners: number[] };
+
 export type FinalResult = {
   reason: 'fold' | 'showdown';
   table: Card[];
   pot: number;
+  pots: Pot[];
   // Empty on a fold: nothing is revealed.
   hands: SeatCards[];
   combinations: SeatCombination[];
@@ -81,7 +94,7 @@ export type HandState = {
 
 export type HandAction =
   | { type: 'decide'; seat: number; decision: Decision }
-  | { type: 'bet'; seat: number; kind: BetKind }
+  | { type: 'bet'; seat: number; action: BetAction }
   | { type: 'timeout' }
   | { type: 'advance' };
 
@@ -90,7 +103,7 @@ export type HandEvent =
   | { type: 'decisionLocked'; seat: number }
   | { type: 'round1Resolved'; result: Round1Result }
   | { type: 'finalStarted'; table: Card[] }
-  | { type: 'betPlaced'; seat: number; kind: BetKind; amount: number }
+  | { type: 'betPlaced'; seat: number; kind: BetKind; amount: number; allIn: boolean }
   | { type: 'handEnded'; result: FinalResult };
 
 export type StepError =
@@ -103,6 +116,7 @@ export type StepError =
   | 'card_not_in_hand'
   | 'not_your_turn'
   | 'illegal_bet'
+  | 'bad_raise_size'
   | 'insufficient_stack';
 
 export type StepResult = { ok: true; state: HandState; events: HandEvent[] } | { ok: false; reason: StepError };
@@ -119,11 +133,21 @@ export type PlayerView = {
   stayed: boolean | null;
   shown: Card | null;
   folded: boolean;
+  allIn: boolean;
   committed: number;
   roundCommitted: number;
 };
 
-export type BettingView = { level: number; bets: number; cap: number; unit: number; actor: number | null };
+export type BettingView = { level: number; minRaise: number; actor: number | null };
+
+// What the seat to act may do: call is the chips a call costs (0 when a check is possible), capped
+// by the stack (callAllIn then); raise is the legal range of 'to' values, null when the seat cannot raise.
+export type BetOptions = {
+  canCheck: boolean;
+  call: number;
+  callAllIn: boolean;
+  raise: { min: number; max: number } | null;
+};
 
 // Round 1: what each card in your hand would make, shown, with the two table cards. Your own
 // cards plus public cards, nothing hidden. Empty outside Round 1.
@@ -134,7 +158,8 @@ export type YouView = {
   hand: Card[];
   decision: Decision | null;
   canDecide: boolean;
-  legalBets: BetKind[];
+  // Non-null only when it is your turn to bet.
+  bet: BetOptions | null;
   options: CardOption[];
   // Final: the best three cards among your hand and the table; null before the Final.
   best: Combination | null;

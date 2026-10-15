@@ -1,13 +1,13 @@
+@import './tokens.css';
+
 :root {
-  --bg: #14110f;
-  --panel: #1d1a17;
-  --parchment: #2a241f;
-  --line: #4a4038;
-  --ink: #e8dcc4;
-  --muted: #9a8f7e;
-  --gold: #c9a227;
-  --burn: #d0342c;
-  --green: #6a994e;
+  --bg: var(--ground);
+  --panel: var(--surface);
+  --parchment: var(--raised);
+  --line: var(--outline);
+  --muted: var(--ink-muted);
+  --burn: var(--ember);
+  --green: var(--element-earth);
   color-scheme: dark;
 }
 
@@ -185,31 +185,6 @@ code {
   min-width: 0;
 }
 
-.chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--parchment);
-  font-size: 10px;
-  line-height: 1;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.chip b {
-  font-weight: normal;
-  font-size: 13px;
-  letter-spacing: 0;
-  color: var(--gold);
-  font-variant-numeric: tabular-nums;
-}
-
 .dot {
   flex: none;
   width: 8px;
@@ -247,21 +222,154 @@ code {
   min-width: 0;
 }
 
-.rules p {
-  margin: 0 0 8px;
+/* ---- rules: four steps, each a badge, a title, a mini-card diagram and one caption. Stacked in
+   the name screen's column, a 2x2 grid in the overlay. ---- */
+.rules-lead {
+  margin: 0 0 10px;
+  color: var(--muted);
 }
 
-.rules ul {
+.steps {
+  list-style: none;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-.rules li {
-  margin-bottom: 6px;
+.rules.compact .steps {
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
-.rules li::marker {
+.step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.rules.compact .step {
+  padding: 6px 8px;
+  row-gap: 3px;
+}
+
+/* In the narrow column the caption runs under the badge, full width, so it stays to two or three lines. */
+.rules.compact .step-badge {
+  grid-row: 1 / span 2;
+}
+
+.rules.compact .step-caption {
+  grid-column: 1 / -1;
+}
+
+.step-badge {
+  grid-row: 1 / span 3;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold);
+  color: #1c150c;
+  font-size: 12px;
+}
+
+.step-title {
+  line-height: 22px;
+  color: var(--ink);
+}
+
+.step-diagram {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.rules.compact .step-diagram {
+  min-height: 24px;
+  gap: 4px;
+}
+
+.step-caption {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.rules.compact .step-caption {
+  font-size: 11px;
+}
+
+.step-gap {
+  width: 4px;
+}
+
+.step-arrow {
+  color: var(--muted);
+}
+
+.step-label {
+  font-size: 11px;
   color: var(--gold);
+}
+
+.rules-ante {
+  width: 26px;
+  height: 26px;
+  margin-left: 4px;
+  border-radius: 50%;
+  border: 2px dashed #f0d672;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold);
+  color: #1c150c;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.rules-bets {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 2px;
+}
+
+.rules-bet {
+  padding: 3px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.rules-bet.fold {
+  background: rgba(208, 52, 44, 0.25);
+  border: 1px solid var(--burn);
+}
+
+.rules-bet.call {
+  background: var(--parchment);
+  border: 1px solid var(--line);
+}
+
+.rules-bet.raise {
+  background: var(--gold);
+  border: 1px solid var(--gold);
+  color: #1c150c;
 }
 
 .lobby {
@@ -375,8 +483,8 @@ code {
   }
 }
 
-/* The board and the control bar sit together, centred in the column: the board keeps the table's
-   16:9 and the bar hangs right under it, so there is no hole between them on tall screens. */
+/* The board and the dock slot sit together, centred in the column: the board keeps the table's
+   16:9 and the dock hangs right under it, so there is no hole between them on tall screens. */
 .play {
   flex: 1;
   min-height: 0;
@@ -392,7 +500,7 @@ code {
   flex: 0 1 auto;
   width: 100%;
   aspect-ratio: 16 / 9;
-  max-height: calc(100% - 196px);
+  max-height: calc(100% - 252px);
   min-height: 0;
 }
 
@@ -424,7 +532,8 @@ code {
 }
 
 .overlay .panel {
-  max-width: 520px;
+  width: 820px;
+  max-width: 100%;
   max-height: 100%;
   overflow: auto;
   background: var(--parchment);
@@ -434,122 +543,452 @@ code {
   margin-top: 10px;
 }
 
-/* ---- the control bar: a fixed-height strip under the board. Tiles on the left, the action cluster
-   centred over the table as long as the tiles leave room (the empty third column balances them),
-   the hint under the buttons. ---- */
-.hud {
+/* ---- the action dock: a slot of fixed height under the board, so the board never resizes; the dock
+   aligns to the slot's top and overlaps the table's bottom rim, growing and shrinking with its rows. ---- */
+.dock-slot {
   flex: none;
-  height: 96px;
-  margin-top: 8px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.hud-actions {
+  height: 160px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-width: 260px;
-  max-width: 640px;
 }
 
-/* Without buttons the status takes their room: a Round 1 or showdown result reads in full. */
-.hud-actions.no-actions .hud-status {
-  height: 56px;
-  line-height: 18px;
-  white-space: normal;
-  text-align: center;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.hud-actions.no-actions .hud-buttons {
-  display: none;
-}
-
-.hud-status {
-  max-width: 100%;
-  height: 18px;
-  line-height: 18px;
-  font-size: 14px;
+.dock {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100% - 32px);
+  margin-top: -12px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid var(--gold-dark);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--gold) 25%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-body);
+  transition: height 200ms ease;
 }
 
-.hud-buttons {
+.dock-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 16px;
+}
+
+/* Row 1: the status strip. Left the turn, centre the numbers, right the best hand. */
+.dock-status {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 40px;
-}
-
-.hud-hint {
-  margin: 0;
-  max-width: 100%;
-  height: 14px;
-  line-height: 14px;
-  font-size: 11px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 16px;
+  min-height: 26px;
+  line-height: 26px;
   white-space: nowrap;
 }
 
-/* Pill buttons: the action cluster. The label and its amount share a baseline inside the centred span. */
-.pill {
-  height: 40px;
-  min-width: 104px;
-  padding: 0 20px;
-  border-radius: 999px;
-  border: 1px solid #7a6540;
-  background: linear-gradient(180deg, #3a3028 0%, #26201a 100%);
-  color: var(--ink);
-  font-size: 14px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  box-shadow: 0 2px 0 #0d0a08, inset 0 1px 0 #4d4034;
+.dock-turn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.pill > span {
+.dock-timer {
+  flex: none;
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.dock-timer::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.dock-mine,
+.dock-waiting {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dock-mine {
+  color: var(--gold-light);
+}
+
+.dock-mine::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--fire);
+  vertical-align: 2px;
+  animation: dock-pulse 1.1s infinite ease-in-out;
+}
+
+@keyframes dock-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+.dock-waiting {
+  color: var(--ink-muted);
+}
+
+.dock-centre {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-stat {
   display: inline-flex;
   align-items: baseline;
-  gap: 7px;
+  gap: 6px;
 }
 
-.pill small {
+.dock-stat + .dock-stat::before {
+  content: '·';
+  margin-right: 4px;
+  color: var(--ink-muted);
+}
+
+.dock-label {
   font-size: 12px;
-  color: var(--gold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.dock-value {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-right {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.dock-emblem {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.dock-emblem.fire {
+  background: var(--element-fire);
+}
+
+.dock-emblem.water {
+  background: var(--element-water);
+}
+
+.dock-emblem.earth {
+  background: var(--element-earth);
+}
+
+.dock-emblem.air {
+  background: var(--element-air);
+}
+
+.dock-best,
+.dock-words {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+/* A result sentence takes the whole row and may run to two lines. */
+.dock-sentence {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+  font-size: 15px;
+  color: var(--ink);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.dock-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+/* Row 2: raise controls, only when a raise is possible. */
+.dock-raise {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+}
+
+.dock-presets {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.dock-preset {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--gold) 25%, transparent);
+  background: var(--raised);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dock-preset:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--ink);
+}
+
+.dock-preset.active {
+  border-color: var(--gold);
+  color: var(--gold-light);
+}
+
+.dock-slider {
+  flex: 1;
+  min-width: 0;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background:
+    linear-gradient(var(--gold), var(--gold)) no-repeat left center / 0% 100%,
+    linear-gradient(var(--gold-dark), var(--gold-dark)) no-repeat left center / 100% 100%;
+  background-clip: content-box;
+  padding-block: 6px;
+  cursor: pointer;
+}
+
+.dock-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--outline);
+  background: linear-gradient(var(--gold-light), var(--gold-dark));
+}
+
+.dock-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--outline);
+  background: linear-gradient(var(--gold-light), var(--gold-dark));
+}
+
+.dock-amount {
+  flex: none;
+  width: 84px;
+  height: 32px;
+  padding: 0 8px;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+}
+
+.dock-amount::-webkit-inner-spin-button,
+.dock-amount::-webkit-outer-spin-button {
+  appearance: none;
+}
+
+/* Row 3: the actions. Three equal columns; two in Round 1. */
+.dock-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  height: 52px;
+}
+
+.dock-actions.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.dock-btn {
+  position: relative;
+  height: 52px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 3px 0 #1c130b;
+}
+
+.dock-btn-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dock-btn-amount {
+  font-weight: 400;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-btn.fold {
+  background: linear-gradient(#6a1a14, #3d0d0a);
+  border: 1px solid var(--blood);
+  color: #f3d6cf;
+}
+
+.dock-btn.neutral {
+  background: linear-gradient(#3a352d, #26231e);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  color: var(--ink);
+}
+
+.dock-btn.primary {
+  background: linear-gradient(#f0c45a, #c98a26);
+  border: 1px solid var(--gold-dark);
+  color: #2b2016;
+}
+
+.dock-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  color: inherit;
+  border-color: inherit;
+}
+
+.dock-btn.fold:hover:not(:disabled) {
+  color: #f3d6cf;
+  border-color: var(--blood);
+}
+
+.dock-btn.neutral:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--gold) 30%, transparent);
+}
+
+.dock-btn.primary:hover:not(:disabled) {
+  color: #2b2016;
+  border-color: var(--gold-dark);
+}
+
+.dock-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 1px 0 #1c130b;
+}
+
+.dock-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.dock-btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  cursor: not-allowed;
+}
+
+.dock-key {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ink-muted);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 400;
   letter-spacing: 0;
+  line-height: 14px;
+  text-align: center;
+  color: var(--ink-muted);
 }
 
-.pill.primary {
-  background: linear-gradient(180deg, #e2bb45 0%, #b88d1f 100%);
-  border-color: #e9c75c;
-  color: #1c150c;
-  box-shadow: 0 2px 0 #5c4510, inset 0 1px 0 #f3dc8a;
+.dock-btn.primary .dock-key {
+  color: #2b2016;
+  border-color: color-mix(in srgb, #2b2016 50%, transparent);
 }
 
-.pill.primary small {
-  color: #3a2a08;
-}
+@media (max-width: 640px) {
+  .dock {
+    width: calc(100% - 16px);
+  }
 
-.pill.primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #f0ca55 0%, #c69a2a 100%);
-  color: #1c150c;
-}
+  /* Two lines: the turn on the first, the numbers and the best hand on the second. */
+  .dock-status {
+    flex-wrap: wrap;
+    line-height: 24px;
+    row-gap: 0;
+    column-gap: 12px;
+  }
 
-.pill.quiet {
-  background: transparent;
-  border-color: var(--line);
-}
+  .dock-turn {
+    flex: 1 0 100%;
+  }
 
-.pill:disabled {
-  opacity: 0.35;
+  .dock-centre {
+    justify-content: flex-start;
+  }
+
+  .dock-presets {
+    overflow-x: auto;
+    max-width: 50%;
+  }
+
+  .dock-actions,
+  .dock-btn {
+    height: 48px;
+  }
+
+  .dock-key {
+    display: none;
+  }
 }
 
 /* ---- side panels ---- */
@@ -607,15 +1046,16 @@ code {
 .combos th {
   text-align: left;
   font-weight: normal;
-  vertical-align: top;
+  vertical-align: middle;
   white-space: nowrap;
   color: var(--ink);
-  padding: 3px 8px 3px 6px;
+  padding: 1px 8px 1px 6px;
 }
 
 .combos td {
-  color: var(--muted);
-  padding: 3px 6px 3px 0;
+  vertical-align: middle;
+  padding: 1px 6px 1px 0;
+  text-align: right;
 }
 
 .combos tr.active th,
@@ -642,11 +1082,112 @@ code {
 }
 
 .history li {
-  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 0;
   border-top: 1px solid var(--line);
 }
 
 .history li:first-child {
-  color: var(--ink);
   border-top: none;
+}
+
+.hist-hand {
+  flex: none;
+  color: var(--ink);
+}
+
+.hist-stage {
+  flex: none;
+  width: 20px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.hist-winners {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.hist-winner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.hist-winner b {
+  font-weight: normal;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.hist-note {
+  flex: none;
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* ---- mini cards: the element is the colour, the power is the number ---- */
+.mini {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 30px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1;
+  color: #fff6e6;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini.sm {
+  width: 18px;
+  height: 24px;
+  font-size: 11px;
+}
+
+.mini.fire {
+  background: var(--element-fire);
+}
+
+.mini.water {
+  background: var(--element-water);
+}
+
+.mini.earth {
+  background: var(--element-earth);
+}
+
+.mini.air {
+  background: var(--element-air);
+  color: #1c150c;
+}
+
+.mini.back {
+  background: radial-gradient(circle at center, #8b6fb3 0 2.5px, #3b2a52 3.5px);
+  border: 1px solid #5b4580;
+}
+
+.mini.lit {
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.mini-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }

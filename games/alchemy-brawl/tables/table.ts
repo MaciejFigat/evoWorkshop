@@ -2,11 +2,11 @@ import { randomInt } from 'node:crypto';
 import {
   MIN_PLAYERS,
   fullDeck,
-  maxHandCost,
+  rebuyBelow,
   startHand,
   step,
   viewFor,
-  type BetKind,
+  type BetAction,
   type Decision,
   type HandAction,
   type HandEvent,
@@ -32,7 +32,7 @@ const SEED_RANGE = 2 ** 31;
 
 export type PlayerMove =
   | { type: 'decide'; decision: Decision }
-  | { type: 'bet'; kind: BetKind };
+  | { type: 'bet'; action: BetAction };
 
 export type TableHooks = {
   deliver: (playerId: string, message: ServerMessage) => void;
@@ -187,7 +187,7 @@ export class Table {
       this.broadcast([]);
       return;
     }
-    const floor = maxHandCost(this.config.rules);
+    const floor = rebuyBelow(this.config.rules);
     this.seats = this.seats.map((s) => (s.stack < floor ? { ...s, stack: this.config.buyIn } : s));
     this.button = (this.button + 1) % this.seats.length;
     this.handSeed = randomInt(SEED_RANGE);

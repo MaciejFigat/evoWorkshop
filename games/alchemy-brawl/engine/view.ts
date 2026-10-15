@@ -1,4 +1,4 @@
-import { legalBets } from './hand.ts';
+import { betOptions } from './hand.ts';
 import { bestCombination, bestOfCards } from './scoring.ts';
 import type { CardOption, HandState, HandView, PlayerView, YouView } from './types.ts';
 
@@ -12,6 +12,7 @@ export function viewFor(state: HandState, seat: number | null): HandView {
     stayed: windowOpen ? null : player.decision?.kind === 'stay',
     shown: windowOpen ? null : player.shown,
     folded: player.folded,
+    allIn: player.allIn,
     committed: player.committed,
     roundCommitted: player.roundCommitted,
   }));
@@ -28,9 +29,7 @@ export function viewFor(state: HandState, seat: number | null): HandView {
         ? null
         : {
             level: state.betting.level,
-            bets: state.betting.bets,
-            cap: state.rules.maxBetsPerRound,
-            unit: state.rules.finalBet,
+            minRaise: state.betting.minRaise,
             actor: state.betting.toAct[0] ?? null,
           },
     round1: state.round1,
@@ -52,7 +51,7 @@ function youFor(state: HandState, seat: number): YouView | null {
     hand: [...player.hand],
     decision: player.decision,
     canDecide: state.phase === 'decide' && player.decision === null,
-    legalBets: legalBets(state, seat),
+    bet: betOptions(state, seat),
     options,
     // A folded player still sees their own best: it is their own cards plus public ones.
     best: inFinal ? bestOfCards([...player.hand, ...state.table]) : null,

@@ -2,12 +2,15 @@ import { sameCard, type Card } from './cards.ts';
 import { MIN_PLAYERS, round1Pot, type Rules } from './config.ts';
 import { bestCombination, bestOfCards, winnersOf } from './scoring.ts';
 import type {
-  BetKind,
+  BetAction,
+  BetOptions,
   Decision,
   FinalResult,
   HandAction,
   HandEvent,
+  HandPlayer,
   HandState,
+  Pot,
   Round1Result,
   SeatCard,
   SeatCards,
@@ -17,7 +20,8 @@ import type {
 } from './types.ts';
 
 export const CARDS_PER_PLAYER = 4;
-export const TABLE_CARDS = 5;
+// The Round 1 pair stays on the table; the Final adds one card to it.
+export const TABLE_CARDS = 3;
 export const ROUND1_TABLE = 2;
 export const FINAL_TABLE = 3;
 const INITIAL_HAND = 3;
@@ -46,6 +50,8 @@ export function startHand(rules: Rules, seats: SeatStake[], button: number, deck
       decision: null,
       shown: null,
       folded: false,
+      // The ante may take the last chip: that seat plays the hand without acting in the Final.
+      allIn: seat.stack === rules.ante,
       committed: rules.ante,
       roundCommitted: 0,
     })),
@@ -74,14 +80,22 @@ export function step(state: HandState, action: HandAction): StepResult {
   return error === null ? { ok: true, state: next, events } : { ok: false, reason: error };
 }
 
-export function legalBets(state: HandState, seat: number): BetKind[] {
+// What the seat may do right now; null unless it is that seat's turn. `raise` holds 'to' values:
+// the seat's total commitment in this betting round after the raise.
+export function betOptions(state: HandState, seat: number): BetOptions | null {
   const betting = state.betting;
   const player = state.players[seat];
   if (state.phase !== 'bet' || betting === null || player === undefined || betting.toAct[0] !== seat) {
-    return [];
+    return null;
   }
-  const raise: BetKind[] = betting.bets < state.rules.maxBetsPerRound ? [betting.level === 0 ? 'bet' : 'raise'] : [];
-  return betting.level === player.roundCommitted ? ['check', ...raise] : ['fold', 'call', ...raise];
+  const owed = betting.level - player.roundCommitted;
+  const max = player.roundCommitted + player.stack;
+  return {
+    canCheck: owed === 0,
+    call: Math.min(owed, player.stack),
+    callAllIn: owed > 0 && owed >= player.stack,
+    raise: max > betting.level ? { min: Math.min(betting.level + betting.minRaise, max), max } : null,
+  };
 }
 
 export function activeOrder(state: HandState, start: number): number[] {
@@ -93,12 +107,23 @@ function seatsFrom(state: HandState, start: number): number[] {
   return Array.from({ length: count }, (_, i) => (start + i) % count);
 }
 
+function canAct(player: HandPlayer): boolean {
+  return !player.folded && !player.allIn;
+}
+
+function actingOrder(state: HandState, start: number): number[] {
+  return seatsFrom(state, start).filter((seat) => {
+    const player = state.players[seat];
+    return player !== undefined && canAct(player);
+  });
+}
+
 function apply(state: HandState, action: HandAction, events: HandEvent[]): StepError | null {
   switch (action.type) {
     case 'decide':
       return decide(state, action.seat, action.decision, events);
     case 'bet':
-      return bet(state, action.seat, action.kind, events);
+      return bet(state, action.seat, action.action, events);
     case 'timeout':
       return timeout(state, events);
     case 'advance':
@@ -142,11 +167,11 @@ function dealInitial(state: HandState): StepError | null {
 }
 
 function turnTable(state: HandState, count: number): StepError | null {
-  const table = state.deck.splice(0, count);
-  if (table.length < count) {
+  const turned = state.deck.splice(0, count);
+  if (turned.length < count) {
     return 'deck_too_small';
   }
-  state.table = table;
+  state.table.push(...turned);
   return null;
 }
 
@@ -211,7 +236,7 @@ function resolveRound1(state: HandState, events: HandEvent[]): void {
   events.push({ type: 'round1Resolved', result });
 }
 
-// Everyone draws to four cards, the three table cards go up and betting starts at once.
+// Everyone draws to four cards, a third card joins the Round 1 pair and betting starts at once.
 function startFinal(state: HandState, events: HandEvent[]): StepError | null {
   for (const seat of activeOrder(state, state.button + 1)) {
     const error = drawCard(state, seat);
@@ -219,17 +244,17 @@ function startFinal(state: HandState, events: HandEvent[]): StepError | null {
       return error;
     }
   }
-  const error = turnTable(state, FINAL_TABLE);
+  const error = turnTable(state, FINAL_TABLE - ROUND1_TABLE);
   if (error !== null) {
     return error;
   }
   state.phase = 'bet';
-  state.betting = { level: 0, bets: 0, toAct: activeOrder(state, state.button + 1) };
+  state.betting = { level: 0, minRaise: state.rules.minBet, toAct: actingOrder(state, state.button + 1) };
   events.push({ type: 'finalStarted', table: [...state.table] });
   return null;
 }
 
-function bet(state: HandState, seat: number, kind: BetKind, events: HandEvent[]): StepError | null {
+function bet(state: HandState, seat: number, action: BetAction, events: HandEvent[]): StepError | null {
   const betting = state.betting;
   if (state.phase !== 'bet' || betting === null) {
     return 'wrong_phase';
@@ -241,35 +266,62 @@ function bet(state: HandState, seat: number, kind: BetKind, events: HandEvent[])
   if (betting.toAct[0] !== seat) {
     return 'not_your_turn';
   }
-  if (!legalBets(state, seat).includes(kind)) {
-    return 'illegal_bet';
-  }
+  const owed = betting.level - player.roundCommitted;
   let amount = 0;
-  if (kind === 'fold') {
-    player.folded = true;
-    betting.toAct.shift();
-  } else {
-    const aggressive = kind === 'bet' || kind === 'raise';
-    const level = aggressive ? betting.level + state.rules.finalBet : betting.level;
-    amount = level - player.roundCommitted;
-    if (amount > player.stack) {
-      return 'insufficient_stack';
+  switch (action.kind) {
+    case 'fold':
+      player.folded = true;
+      betting.toAct.shift();
+      break;
+    case 'check':
+      if (owed !== 0) {
+        return 'illegal_bet';
+      }
+      betting.toAct.shift();
+      break;
+    case 'call':
+      if (owed === 0) {
+        return 'illegal_bet';
+      }
+      amount = Math.min(owed, player.stack);
+      betting.toAct.shift();
+      break;
+    case 'raise': {
+      if (action.to <= betting.level) {
+        return 'bad_raise_size';
+      }
+      amount = action.to - player.roundCommitted;
+      if (amount > player.stack) {
+        return 'insufficient_stack';
+      }
+      const increment = action.to - betting.level;
+      const full = increment >= betting.minRaise;
+      if (!full && amount !== player.stack) {
+        return 'bad_raise_size';
+      }
+      betting.level = action.to;
+      if (full) {
+        // A full raise reopens the action for every other seat that can still act.
+        betting.minRaise = increment;
+        betting.toAct = actingOrder(state, seat + 1).filter((s) => s !== seat);
+      } else {
+        // A short all-in raises the level but gives nobody a second turn.
+        betting.toAct.shift();
+      }
+      break;
     }
-    if (aggressive) {
-      betting.level = level;
-      betting.bets += 1;
-    }
-    player.stack -= amount;
-    player.committed += amount;
-    player.roundCommitted += amount;
-    state.finalPot += amount;
-    betting.toAct = aggressive ? activeOrder(state, seat + 1).filter((s) => s !== seat) : betting.toAct.slice(1);
   }
-  events.push({ type: 'betPlaced', seat, kind, amount });
+  player.stack -= amount;
+  player.committed += amount;
+  player.roundCommitted += amount;
+  player.allIn = player.allIn || (amount > 0 && player.stack === 0);
+  state.finalPot += amount;
+  events.push({ type: 'betPlaced', seat, kind: action.kind, amount, allIn: player.allIn });
 
   const [last, ...others] = activeOrder(state, 0);
   if (last !== undefined && others.length === 0) {
-    finish(state, { reason: 'fold', hands: [], combinations: [], winners: [last] }, events);
+    const pot: Pot = { amount: state.finalPot, eligible: [last], winners: [last] };
+    finish(state, { reason: 'fold', hands: [], combinations: [], pots: [pot] }, events);
     return null;
   }
   if (betting.toAct.length === 0) {
@@ -294,7 +346,7 @@ function timeout(state: HandState, events: HandEvent[]): StepError | null {
     if (seat === undefined) {
       return 'wrong_phase';
     }
-    return bet(state, seat, legalBets(state, seat).includes('check') ? 'check' : 'fold', events);
+    return bet(state, seat, { kind: betOptions(state, seat)?.canCheck === true ? 'check' : 'fold' }, events);
   }
   return 'wrong_phase';
 }
@@ -311,6 +363,7 @@ function advance(state: HandState, events: HandEvent[]): StepError | null {
 }
 
 // Every remaining hand is shown whole; the combination is the best three among hand and table.
+// Each pot goes to the best combination among the seats eligible for it.
 function showdown(state: HandState, events: HandEvent[]): void {
   const hands: SeatCards[] = [];
   state.players.forEach((player, seat) => {
@@ -322,15 +375,51 @@ function showdown(state: HandState, events: HandEvent[]): void {
     const combination = bestOfCards([...entry.cards, ...state.table]);
     return combination === null ? [] : [{ seat: entry.seat, combination }];
   });
-  finish(state, { reason: 'showdown', hands, combinations, winners: winnersOf(combinations) }, events);
+  const pots = buildPots(state).map((pot) => ({
+    ...pot,
+    winners: winnersOf(combinations.filter((entry) => pot.eligible.includes(entry.seat))),
+  }));
+  finish(state, { reason: 'showdown', hands, combinations, pots }, events);
 }
 
-type Settlement = Pick<FinalResult, 'reason' | 'hands' | 'combinations' | 'winners'>;
+// Pots by contribution level over the Final bets (table stakes). The antes are equal for every
+// seat and the Round 1 share has already been paid out, so the rest of the ante money and any
+// rollover sit in the main pot, which every unfolded seat is eligible for. Folded seats fund the
+// pots but are never eligible; whatever lies above the highest unfolded level stays in the last pot.
+function buildPots(state: HandState): Pot[] {
+  const unfolded = state.players.flatMap((player, seat) => (player.folded ? [] : [seat]));
+  const levels = [...new Set(unfolded.map((seat) => state.players[seat]?.roundCommitted ?? 0))].sort((a, b) => a - b);
+  const betTotal = state.players.reduce((sum, player) => sum + player.roundCommitted, 0);
+  const pots: Pot[] = [];
+  let previous = 0;
+  levels.forEach((level, i) => {
+    const top = i === levels.length - 1;
+    const amount = state.players.reduce(
+      (sum, player) => sum + Math.max(0, (top ? player.roundCommitted : Math.min(player.roundCommitted, level)) - previous),
+      0,
+    );
+    const base = i === 0 ? state.finalPot - betTotal : 0;
+    const eligible = unfolded.filter((seat) => (state.players[seat]?.roundCommitted ?? 0) >= level);
+    if (amount + base > 0) {
+      pots.push({ amount: amount + base, eligible, winners: [] });
+    }
+    previous = level;
+  });
+  return pots;
+}
+
+type Settlement = Pick<FinalResult, 'reason' | 'hands' | 'combinations' | 'pots'>;
 
 function finish(state: HandState, settlement: Settlement, events: HandEvent[]): void {
   const pot = state.finalPot;
-  const payouts = payOut(state, pot, settlement.winners);
-  const result: FinalResult = { ...settlement, table: [...state.table], pot, payouts };
+  const payouts = state.players.map(() => 0);
+  for (const each of settlement.pots) {
+    payOut(state, each.amount, each.winners).forEach((payout, seat) => {
+      payouts[seat] = (payouts[seat] ?? 0) + payout;
+    });
+  }
+  const winners = state.players.flatMap((_, seat) => (settlement.pots.some((p) => p.winners.includes(seat)) ? [seat] : []));
+  const result: FinalResult = { ...settlement, table: [...state.table], pot, winners, payouts };
   state.finalPot = 0;
   state.betting = null;
   state.phase = 'done';

@@ -2,10 +2,11 @@ import { mulberry32 } from '@evo/rng';
 import { describe, expect, it } from 'vitest';
 import { fullDeck, type Card } from './cards.ts';
 import { DEFAULT_RULES } from './config.ts';
-import { legalBets, startHand, step } from './hand.ts';
+import { betOptions, startHand, step } from './hand.ts';
 import { bestCombination, bestOfCards, compareCombinations, winnersOf } from './scoring.ts';
 import {
   CATEGORIES,
+  type BetAction,
   type Category,
   type Combination,
   type Decision,
@@ -23,7 +24,9 @@ type Odds = Record<Category, number>;
 // Spec §8, "player's best", in percent. Round 1: the best shown card with both table cards.
 const ROUND1_SPEC: Odds = { straightFlush: 0.6, three: 0.7, straight: 7.9, flush: 11.5, pair: 30.8, high: 48.5 };
 
-// Spec §8, "player's best", in percent. Final: the best three among the four-card hand and the three table cards.
+// Spec §8, "player's best", in percent. Final: the best three among the four-card hand and the three table
+// cards. The third table card is drawn after the Round 1 pair, which leaves the distribution of three
+// random table cards unchanged.
 const FINAL_SPEC: Odds = { straightFlush: 6.5, three: 7.5, straight: 43.1, flush: 34.9, pair: 7.2, high: 0.8 };
 
 // Spec §8, "wins the round", in percent, with all 6 players revealing their best, plus the share of
@@ -149,12 +152,17 @@ const SEATS = 6;
 const HANDS = 2_000;
 const STACK = 1_000;
 const TIMEOUT_CHANCE = 0.1;
+const ALL_IN_CHANCE = 0.05;
+// A full raise can reopen the action for five seats; stacks bound the number of full raises.
+const MAX_STEPS = 500;
 
 function chips(state: HandState): number {
   return state.players.reduce((sum, p) => sum + p.stack, 0) + state.round1Pot + state.finalPot;
 }
 
-function pick<T>(rng: { int(min: number, max: number): number }, items: T[]): T {
+type Dice = { next(): number; int(min: number, max: number): number };
+
+function pick<T>(rng: Dice, items: T[]): T {
   const item = items[rng.int(0, items.length - 1)];
   if (item === undefined) {
     throw new Error('pick from an empty list');
@@ -162,14 +170,29 @@ function pick<T>(rng: { int(min: number, max: number): number }, items: T[]): T 
   return item;
 }
 
-function randomDecision(rng: { next(): number; int(min: number, max: number): number }, hand: Card[]): Decision {
+function randomDecision(rng: Dice, hand: Card[]): Decision {
   if (rng.next() < 0.5 || hand.length === 0) {
     return { kind: 'skip' };
   }
   return { kind: 'stay', show: pick(rng, hand) };
 }
 
-function randomAction(rng: { next(): number; int(min: number, max: number): number }, state: HandState): HandAction {
+// A random legal no-limit action: any of the offered kinds, a raise anywhere in the legal range,
+// now and then the whole stack.
+function randomBet(rng: Dice, state: HandState, seat: number): BetAction {
+  const options = betOptions(state, seat);
+  if (options === null) {
+    throw new Error('bet phase without options for the actor');
+  }
+  const kinds: BetAction[] = options.canCheck ? [{ kind: 'check' }] : [{ kind: 'fold' }, { kind: 'call' }];
+  if (options.raise !== null) {
+    const to = rng.next() < ALL_IN_CHANCE ? options.raise.max : rng.int(options.raise.min, options.raise.max);
+    kinds.push({ kind: 'raise', to });
+  }
+  return pick(rng, kinds);
+}
+
+function randomAction(rng: Dice, state: HandState): HandAction {
   const timeout = rng.next() < TIMEOUT_CHANCE;
   switch (state.phase) {
     case 'decide': {
@@ -185,7 +208,7 @@ function randomAction(rng: { next(): number; int(min: number, max: number): numb
       if (seat === undefined) {
         throw new Error('bet phase without an actor');
       }
-      return timeout ? { type: 'timeout' } : { type: 'bet', seat, kind: pick(rng, legalBets(state, seat)) };
+      return timeout ? { type: 'timeout' } : { type: 'bet', seat, action: randomBet(rng, state, seat) };
     }
     case 'round1End':
     case 'reveal':
@@ -196,12 +219,13 @@ function randomAction(rng: { next(): number; int(min: number, max: number): numb
 }
 
 describe('random play', () => {
-  // Every hand starts from full stacks, as the table tops them up to maxHandCost before dealing.
-  it(`plays ${HANDS} hands at ${SEATS} seats without errors and conserves chips`, () => {
+  // Every hand starts from full stacks: the table tops a short stack up to the buy-in before dealing.
+  it(`plays ${HANDS} hands at ${SEATS} seats with random no-limit actions, conserving chips`, () => {
     const rng = mulberry32(7);
     const deck = fullDeck();
     const seats = Array.from({ length: SEATS }, (_, i) => ({ id: `p${i}`, stack: STACK }));
     const total = SEATS * STACK;
+    let sidePots = 0;
     for (let hand = 0; hand < HANDS; hand += 1) {
       const started = startHand(DEFAULT_RULES, seats, hand % SEATS, rng.shuffle(deck));
       if (!started.ok) {
@@ -220,20 +244,34 @@ describe('random play', () => {
         if (chips(state) !== total) {
           throw new Error(`hand ${hand} step ${steps}: chips ${chips(state)} != ${total}`);
         }
-        if (steps > 100) {
+        if (steps > MAX_STEPS) {
           throw new Error(`hand ${hand}: no end after ${steps} steps`);
         }
       }
-      expect(state.final).not.toBeNull();
-      if (state.final?.reason === 'showdown') {
-        expect(state.final.hands.length).toBeGreaterThanOrEqual(2);
-        expect(state.final.combinations.length).toBe(state.final.hands.length);
+      const final = state.final;
+      if (final === null) {
+        throw new Error(`hand ${hand}: done without a result`);
+      }
+      if (final.reason === 'showdown') {
+        expect(final.hands.length).toBeGreaterThanOrEqual(2);
+        expect(final.combinations.length).toBe(final.hands.length);
+        if (final.pots.length > 1) {
+          sidePots += 1;
+        }
       } else {
-        expect(state.final?.hands).toEqual([]);
+        expect(final.hands).toEqual([]);
+        expect(final.pots).toHaveLength(1);
+      }
+      expect(final.pots.reduce((sum, pot) => sum + pot.amount, 0)).toBe(final.pot);
+      expect(final.payouts.reduce((sum, payout) => sum + payout, 0)).toBe(final.pot);
+      for (const pot of final.pots) {
+        expect(pot.winners.length).toBeGreaterThan(0);
+        expect(pot.winners.every((seat) => pot.eligible.includes(seat))).toBe(true);
       }
       expect(state.players.every((p) => p.hand.length === 4)).toBe(true);
       expect(state.round1Pot + state.finalPot).toBe(0);
       expect(chips(state)).toBe(total);
     }
+    expect(sidePots).toBeGreaterThan(0);
   });
 });

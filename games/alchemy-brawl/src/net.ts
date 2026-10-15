@@ -1,15 +1,30 @@
 import {
   parseServerMessage,
+  type Card,
+  type Category,
   type ClientMessage,
+  type Combination,
   type HandEvent,
   type LobbyTable,
+  type SeatCombination,
   type ServerError,
   type ServerMessage,
   type TableView,
 } from '@evo/alchemy-brawl/engine';
-import { historyLine, nameResolver } from './text';
+import { nameResolver } from './text';
 
 export type ChatLine = { from: string; playerId: string; text: string };
+
+// One settled round: who took what and the cards that won it. `cards` is empty when there was no
+// contest, and `note` says why: a lone stayer, a Round 1 pot that rolled over, or a win by folds.
+export type HistoryEntry = {
+  handNo: number;
+  stage: 'round1' | 'final';
+  winners: { name: string; amount: number }[];
+  cards: Card[];
+  category: Category | null;
+  note: 'unopposed' | 'rolled' | 'fold' | null;
+};
 
 const CHAT_LINES = 50;
 const HISTORY_LINES = 20;
@@ -21,9 +36,9 @@ export type NetState = {
   lobby: LobbyTable[];
   table: TableView | null;
   events: HandEvent[];
-  // Table chat and the settled rounds of this table, newest last; both start over at another table.
+  // Table chat (newest last) and the settled rounds of this table (newest first); both start over at another table.
   chat: ChatLine[];
-  history: string[];
+  history: HistoryEntry[];
   seq: number;
   receivedAt: number;
   error: ServerError | null;
@@ -116,7 +131,7 @@ export function createConnection(emit: Emit): Net {
         update({
           table: message.view,
           events: message.events,
-          history: [...state.history, ...historyOf(message.view, message.events)].slice(-HISTORY_LINES),
+          history: [...historyOf(message.view, message.events).reverse(), ...state.history].slice(0, HISTORY_LINES),
           seq: state.seq + 1,
           receivedAt: Date.now(),
         });
@@ -175,15 +190,44 @@ export function createConnection(emit: Emit): Net {
   };
 }
 
-function historyOf(view: TableView, events: HandEvent[]): string[] {
+function winningCombination(combinations: SeatCombination[], winners: number[]): Combination | null {
+  const [first] = winners;
+  return combinations.find((entry) => entry.seat === first)?.combination ?? null;
+}
+
+function historyOf(view: TableView, events: HandEvent[]): HistoryEntry[] {
   const hand = view.hand;
   if (hand === null) {
     return [];
   }
   const nameOf = nameResolver(view, hand);
-  return events.flatMap((event) => {
-    const line = historyLine(view.handNo, event, nameOf);
-    return line === null ? [] : [line];
+  const entry = (
+    stage: HistoryEntry['stage'],
+    winners: number[],
+    payouts: number[],
+    combination: Combination | null,
+    note: HistoryEntry['note'],
+  ): HistoryEntry => ({
+    handNo: view.handNo,
+    stage,
+    winners: winners.map((seat) => ({ name: nameOf(seat), amount: payouts[seat] ?? 0 })),
+    cards: combination?.cards ?? [],
+    category: combination?.category ?? null,
+    note,
+  });
+  return events.flatMap((event): HistoryEntry[] => {
+    if (event.type === 'round1Resolved') {
+      const result = event.result;
+      const combination = winningCombination(result.combinations, result.winners);
+      const note = result.rolledOver ? 'rolled' : combination === null ? 'unopposed' : null;
+      return [entry('round1', result.winners, result.payouts, combination, note)];
+    }
+    if (event.type === 'handEnded') {
+      const result = event.result;
+      const combination = result.reason === 'fold' ? null : winningCombination(result.combinations, result.winners);
+      return [entry('final', result.winners, result.payouts, combination, result.reason === 'fold' ? 'fold' : null)];
+    }
+    return [];
   });
 }
 

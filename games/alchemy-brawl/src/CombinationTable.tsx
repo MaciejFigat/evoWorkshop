@@ -1,15 +1,18 @@
 import { bestCombination, compareCombinations, sameCard, type Card, type Category, type Combination, type HandView } from '@evo/alchemy-brawl/engine';
+import { CardRow } from './MiniCard';
 import type { Selection } from './selection';
-import { cardName } from './text';
 
-// Best first, as the player reads it; the engine's CATEGORIES run the other way.
-const ROWS: { category: Category; name: string; rule: string }[] = [
-  { category: 'straightFlush', name: 'Straight flush', rule: 'three consecutive powers of one element' },
-  { category: 'three', name: 'Three of a kind', rule: 'three of one power' },
-  { category: 'straight', name: 'Straight', rule: 'three consecutive powers' },
-  { category: 'flush', name: 'Flush', rule: 'three of one element' },
-  { category: 'pair', name: 'Pair', rule: 'two of one power' },
-  { category: 'high', name: 'High card', rule: 'none of the above' },
+const card = (element: Card['element'], power: number): Card => ({ element, power });
+
+// Best first, as the player reads it; the engine's CATEGORIES run the other way. The example
+// shows the pattern: same element for a flush, consecutive powers for a straight.
+const ROWS: { category: Category; name: string; example: Card[] }[] = [
+  { category: 'straightFlush', name: 'Straight flush', example: [card('fire', 7), card('fire', 8), card('fire', 9)] },
+  { category: 'three', name: 'Three of a kind', example: [card('fire', 5), card('water', 5), card('earth', 5)] },
+  { category: 'straight', name: 'Straight', example: [card('earth', 4), card('air', 5), card('water', 6)] },
+  { category: 'flush', name: 'Flush', example: [card('water', 2), card('water', 7), card('water', 11)] },
+  { category: 'pair', name: 'Pair', example: [card('fire', 9), card('earth', 9), card('air', 4)] },
+  { category: 'high', name: 'High card', example: [card('air', 2), card('earth', 7), card('fire', 12)] },
 ];
 
 function optionCombination(hand: HandView, card: Card | null): Combination | null {
@@ -65,11 +68,13 @@ export function CombinationTable({ active }: { active: Combination | null }) {
     <table className="combos">
       <tbody>
         {ROWS.map((row) => {
-          const cards = active !== null && active.category === row.category ? active.cards.map(cardName).join(' · ') : null;
+          const live = active !== null && active.category === row.category;
           return (
-            <tr key={row.category} className={cards === null ? '' : 'active'}>
+            <tr key={row.category} className={live ? 'active' : ''}>
               <th>{row.name}</th>
-              <td>{cards ?? row.rule}</td>
+              <td>
+                <CardRow cards={live ? active.cards : row.example} size="sm" />
+              </td>
             </tr>
           );
         })}
