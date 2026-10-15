@@ -4,8 +4,9 @@ import { CardRow, MiniBack, MiniCard, type MiniSize } from './MiniCard';
 
 const card = (element: Card['element'], power: number): Card => ({ element, power });
 
-// One worked hand runs through the four steps: the 9 Water shown in Round 1 makes a straight with
-// the table; in the Final the 11 Fire joins the pair, and the drawn 11 Water makes three 11s.
+// One worked hand runs through the four steps: the 9 Water shown in Round 1 makes a three-card
+// straight with the table; in the Final the 11 Fire joins the pair and the drawn 11 Water makes
+// three 11s, the five cards being 11-11-11-10-9.
 const SHOWN = card('water', 9);
 const ROUND1_TABLE = [card('air', 10), card('earth', 11)];
 const FINAL_TABLE = [...ROUND1_TABLE, card('fire', 11)];
@@ -38,7 +39,10 @@ export function Rules({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`rules${compact ? ' compact' : ''}`}>
       <h2>How to play</h2>
-      <p className="rules-lead">A poker-family game in two rounds; the pot is paid in two stages.</p>
+      <p className="rules-lead">
+        A poker-family game in two rounds; the pot is paid in two stages. Round 1 ranks three cards and the Final five, so a
+        straight beats a flush in Round 1 and a flush beats a straight in the Final.
+      </p>
       <ol className="steps">
         <Step number={1} title="Deal" caption="Everyone antes 10 and gets 3 cards.">
           <Backs count={3} size={size} />
@@ -47,7 +51,7 @@ export function Rules({ compact = false }: { compact?: boolean }) {
         <Step
           number={2}
           title="Round 1: show or skip"
-          caption="To stay, turn one card face up. It plays with the two table cards for 30% of the antes and stays visible. Skip and keep everything hidden."
+          caption="To stay, turn one card face up. It makes a three-card hand with the two table cards for 30% of the antes and stays visible. Skip and keep everything hidden."
         >
           <span className="mini-row">
             <MiniBack size={size} />
@@ -61,7 +65,7 @@ export function Rules({ compact = false }: { compact?: boolean }) {
         <Step
           number={3}
           title="Draw and bet"
-          caption="Everyone draws to 4. A third table card joins the pair, then no-limit betting for 70% plus the bets."
+          caption="Everyone draws to 4. A third table card joins the pair, then no-limit betting for 70% plus the bets. Every card you hold plays."
         >
           <Backs count={4} size={size} />
           <span className="step-gap" />
@@ -72,10 +76,14 @@ export function Rules({ compact = false }: { compact?: boolean }) {
             <span className="rules-bet raise">Raise</span>
           </span>
         </Step>
-        <Step number={4} title="Showdown" caption="Best three cards among your hand and the table win. Equal hands split. Nothing is ever discarded.">
-          <CardRow cards={FINAL_HAND} size={size} lit={[3]} />
+        <Step
+          number={4}
+          title="Showdown"
+          caption="Your best five cards among your hand and the three table cards, ranked as in poker, win. Equal hands split. Nothing is ever discarded."
+        >
+          <CardRow cards={FINAL_HAND} size={size} lit={[0, 3]} />
           <span className="step-gap" />
-          <CardRow cards={FINAL_TABLE} size={size} lit={[1, 2]} />
+          <CardRow cards={FINAL_TABLE} size={size} lit={[0, 1, 2]} />
           <span className="step-label">three 11s</span>
         </Step>
       </ol>

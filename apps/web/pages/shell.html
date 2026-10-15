@@ -1223,7 +1223,7 @@ main:focus { outline: none; }
       tags: ['multiplayer', 'cards', 'table'],
       tagline: 'Two rounds: one shown card against two table cards, then your whole hand against three.',
       description:
-        'A table for 3–11 seats. Round 1 is a free stay-or-skip gamble for 30% of the antes: turn one card face up, and it plays with the two table cards. Nothing is spent and nobody discards. Everyone draws to 4 cards, a third table card joins the two from Round 1, and the Final is no-limit betting for the rest: fold, check, call or raise to any amount from 30, all-in allowed. All your cards play, the best three among your hand and the table decide the showdown. Play money only in this prototype.',
+        'A table for 3–11 seats. Round 1 is a free stay-or-skip gamble for 30% of the antes: turn one card face up, and it plays with the two table cards. Nothing is spent and nobody discards. Everyone draws to 4 cards, a third table card joins the two from Round 1, and the Final is no-limit betting for the rest: fold, check, call or raise to any amount from 30, all-in allowed. All your cards play: the best five among your hand and the three table cards, ranked as a normal poker hand, decide the showdown. Play money only in this prototype.',
       passport: {
         kind: 'Game',
         randomness: 'Shuffled deck, one server seed per hand',
@@ -1234,7 +1234,7 @@ main:focus { outline: none; }
         redFlags: 'Collusion, bots at real-money tables',
       },
       readme:
-        '# Alchemy Brawl\n\nA multiplayer card game with its own tables on this server.\n\n## Play\nEnter a name, create a table or join one by its code, and add bots to fill the seats.\n\n## Rules\n- Everyone antes; 30% goes to Round 1, 70% to the Final.\n- Round 1: stay (turn one card face up) or skip. No betting, nothing is spent. Your shown card plus the two table cards make a three-card poker hand; the shown card stays in your hand, face up, until the hand ends.\n- Everyone draws a card, to 4. Final: a third table card joins the two from Round 1, then no-limit betting: fold, check, call, or raise to any amount from a minimum of 30; all-in is allowed and side pots are standard. All your cards play.\n- Showdown: the best three cards among your hand and the table, ranked as a three-card poker hand.',
+        '# Alchemy Brawl\n\nA multiplayer card game with its own tables on this server.\n\n## Play\nEnter a name, create a table or join one by its code, and add bots to fill the seats.\n\n## Rules\n- Everyone antes; 30% goes to Round 1, 70% to the Final.\n- Round 1: stay (turn one card face up) or skip. No betting, nothing is spent. Your shown card plus the two table cards make a three-card poker hand; the shown card stays in your hand, face up, until the hand ends.\n- Everyone draws a card, to 4. Final: a third table card joins the two from Round 1, then no-limit betting: fold, check, call, or raise to any amount from a minimum of 30; all-in is allowed and side pots are standard. All your cards play.\n- Showdown: the best five cards among your hand and the three table cards, ranked as a normal poker hand. Each round has its own ranking: a straight beats a flush in the three-card Round 1, a flush beats a straight in the five-card Final; 1 is always low.',
       video: { duration: '3:05', chapters: [['0:00', 'Create a table'], ['0:35', 'Round 1: stay or skip'], ['1:30', 'The Final and betting'], ['2:30', 'Bots']] },
     },
     {

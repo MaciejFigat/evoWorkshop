@@ -1,12 +1,16 @@
 import {
-  CATEGORY_RANK,
+  FIVE_CARD_RANK,
+  THREE_CARD_CATEGORIES,
+  THREE_CARD_RANK,
   compareCombinations,
   type BetAction,
   type BetOptions,
   type Card,
   type CardOption,
+  type Category,
   type Decision,
   type HandView,
+  type ThreeCardCategory,
   type YouView,
 } from '@evo/alchemy-brawl/engine';
 import type { Rng } from '@evo/rng';
@@ -36,11 +40,11 @@ export function chooseBotMove(view: HandView, rng: Rng): BotMove | null {
   return null;
 }
 
-// Round 1: show the card that makes the best combination with the table when it is a pair or
-// better; otherwise bluff-stay now and then with the highest card, else skip.
+// Round 1: show the card that makes the strongest Round 1 combination with the table when it is a
+// pair or better; otherwise bluff-stay now and then with the highest card, else skip.
 function decide(you: YouView, rng: Rng): Decision {
   const best = bestOption(you.options);
-  if (best !== null && CATEGORY_RANK[best.combination.category] >= CATEGORY_RANK.pair) {
+  if (best !== null && round1Rank(best.combination.category) >= THREE_CARD_RANK.pair) {
     return { kind: 'stay', show: best.card };
   }
   const highest = highestCard(you.hand);
@@ -52,19 +56,19 @@ function decide(you: YouView, rng: Rng): Decision {
 
 type Spot = { stack: number; level: number; pot: number };
 
-// The Final: strength is the best three among the hand and the table, as the showdown scores it.
-// A strong hand raises the pot, a medium one raises the minimum now and then and calls cheap
-// bets, a weak one checks or folds. The options already cap every amount by the stack.
+// The Final: strength is the best five among the hand and the table, as the showdown scores it.
+// Three of a kind or better raises the pot, a pair or two pair raises the minimum now and then
+// and calls cheap bets, a high card checks or folds. The options already cap every amount by the stack.
 function bet(you: YouView, options: BetOptions, spot: Spot, rng: Rng): BetAction {
-  const strength = you.best === null ? CATEGORY_RANK.high : CATEGORY_RANK[you.best.category];
+  const strength = you.best === null ? FIVE_CARD_RANK.high : FIVE_CARD_RANK[you.best.category];
   const stayIn: BetAction = options.canCheck ? { kind: 'check' } : { kind: 'call' };
-  if (strength >= CATEGORY_RANK.straight) {
+  if (strength >= FIVE_CARD_RANK.three) {
     if (options.raise !== null) {
       return { kind: 'raise', to: Math.min(options.raise.max, Math.max(options.raise.min, spot.level + spot.pot)) };
     }
     return stayIn;
   }
-  if (strength >= CATEGORY_RANK.pair) {
+  if (strength >= FIVE_CARD_RANK.pair) {
     if (options.raise !== null && rng.next() < MEDIUM_RAISE_RATE) {
       return { kind: 'raise', to: options.raise.min };
     }
@@ -77,6 +81,15 @@ function bet(you: YouView, options: BetOptions, spot: Spot, rng: Rng): BetAction
     return { kind: 'check' };
   }
   return options.call <= spot.stack * WEAK_CALL_SHARE && rng.next() < WEAK_CALL_RATE ? { kind: 'call' } : { kind: 'fold' };
+}
+
+// A Round 1 option is always a three-card category; a five-card-only category cannot occur here and ranks lowest.
+function round1Rank(category: Category): number {
+  return isThreeCardCategory(category) ? THREE_CARD_RANK[category] : THREE_CARD_RANK.high;
+}
+
+function isThreeCardCategory(category: Category): category is ThreeCardCategory {
+  return THREE_CARD_CATEGORIES.some((candidate) => candidate === category);
 }
 
 function bestOption(options: CardOption[]): CardOption | null {

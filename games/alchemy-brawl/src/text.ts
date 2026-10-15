@@ -5,9 +5,12 @@ export type NameOf = (seat: number) => string;
 const CATEGORY_NAME: Record<Category, string> = {
   high: 'high card',
   pair: 'pair',
-  flush: 'flush',
-  straight: 'straight',
+  twoPair: 'two pair',
   three: 'three of a kind',
+  straight: 'straight',
+  flush: 'flush',
+  fullHouse: 'full house',
+  four: 'four of a kind',
   straightFlush: 'straight flush',
 };
 
@@ -26,22 +29,31 @@ function powersHighFirst(combination: Combination): string {
     .join('-');
 }
 
-// 'pair of 10s', 'straight 9-10-11', 'fire flush 10-6-3': what the player reads on a card option.
+// 'pair of 10s', 'straight 13-12-11-10-9', 'fire flush 10-6-3', 'full house, 10s full of 12s': what the
+// player reads on a card option or a result line. key[1] is the power of the main group, key[2] of the
+// second one, in both the three-card and the five-card ranking (spec §5).
 export function describeCombination(combination: Combination): string {
   const [first] = combination.cards;
   const element = first?.element ?? '';
-  const pairPower = combination.key[1] ?? 0;
+  const groupPower = combination.key[1] ?? 0;
+  const secondPower = combination.key[2] ?? 0;
   switch (combination.category) {
     case 'high':
       return `high card ${powersHighFirst(combination)}`;
     case 'pair':
-      return `pair of ${pairPower}s`;
-    case 'flush':
-      return `${element} flush ${powersHighFirst(combination)}`;
+      return `pair of ${groupPower}s`;
+    case 'twoPair':
+      return `two pair, ${groupPower}s and ${secondPower}s`;
+    case 'three':
+      return `three ${groupPower}s`;
     case 'straight':
       return `straight ${powersHighFirst(combination)}`;
-    case 'three':
-      return `three ${pairPower}s`;
+    case 'flush':
+      return `${element} flush ${powersHighFirst(combination)}`;
+    case 'fullHouse':
+      return `full house, ${groupPower}s full of ${secondPower}s`;
+    case 'four':
+      return `four ${groupPower}s`;
     case 'straightFlush':
       return `${element} straight flush ${powersHighFirst(combination)}`;
   }

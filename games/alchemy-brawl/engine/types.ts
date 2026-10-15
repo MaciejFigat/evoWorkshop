@@ -7,12 +7,17 @@ import type { Rules } from './config.ts';
 export type BetAction = { kind: 'fold' } | { kind: 'check' } | { kind: 'call' } | { kind: 'raise'; to: number };
 export type BetKind = BetAction['kind'];
 
-// Three-card poker categories, lowest first. A straight beats a flush (spec §5).
-export const CATEGORIES = ['high', 'pair', 'flush', 'straight', 'three', 'straightFlush'] as const;
+// Every category of either ranking, in five-card order (spec §5.2, lowest first); FIVE_CARD_RANK indexes into it.
+export const CATEGORIES = ['high', 'pair', 'twoPair', 'three', 'straight', 'flush', 'fullHouse', 'four', 'straightFlush'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-// `cards` are the three cards used, the player's own card first in Round 1. `key` compares two combinations
-// lexicographically: category rank first, then the tiebreak powers from spec §5.
+// Round 1 ranking (spec §5.1), lowest first: a three-card straight beats a three-card flush.
+export const THREE_CARD_CATEGORIES = ['high', 'pair', 'flush', 'straight', 'three', 'straightFlush'] as const;
+export type ThreeCardCategory = (typeof THREE_CARD_CATEGORIES)[number];
+
+// `cards` are the cards used: three in Round 1 (the player's shown card first), five in the Final (grouped
+// cards first, then kickers high to low). `key` compares two combinations of the same round lexicographically:
+// the rank of the category in that round's ranking first, then the tiebreak powers from spec §5.
 export type Combination = { category: Category; cards: Card[]; key: number[] };
 
 export type Phase = 'decide' | 'round1End' | 'bet' | 'reveal' | 'done';
@@ -59,7 +64,7 @@ export type Round1Result = {
 };
 
 // The Final plays every card: each remaining hand is shown at the showdown and its combination is
-// the best three cards among the hand and the table, as the board plays in poker.
+// the best five cards among the four-card hand and the three table cards, ranked as in poker.
 // One pot by contribution level: the main pot first, then each side pot; a seat is eligible for
 // every pot it contributed to.
 export type Pot = { amount: number; eligible: number[]; winners: number[] };
@@ -161,7 +166,7 @@ export type YouView = {
   // Non-null only when it is your turn to bet.
   bet: BetOptions | null;
   options: CardOption[];
-  // Final: the best three cards among your hand and the table; null before the Final.
+  // Final: the best five cards among your hand and the table; null before the Final.
   best: Combination | null;
 };
 

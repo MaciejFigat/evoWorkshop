@@ -1,8 +1,8 @@
 {
   "id": "alchemy-brawl",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "title": "Alchemy Brawl",
-  "description": "Multiplayer table game: two rounds, one hidden card each, shared table cards. Your card plus two table cards make a three-card poker hand; Round 1 is a free stay-or-skip gamble, the Final has fixed-limit betting.",
+  "description": "Multiplayer table game: two rounds, shared table cards, nothing ever discarded. Round 1 is a free stay-or-skip gamble: your shown card plus two table cards make a three-card poker hand. The Final is no-limit betting on your best five cards among your hand of four and three table cards, ranked as in poker.",
   "cover": "assets/cover.png",
   "entry": "index.html"
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fullDeck, type Card } from './cards.ts';
 import { DEFAULT_RULES } from './config.ts';
 import { betOptions, startHand, step } from './hand.ts';
-import { bestCombination, bestOfCards, compareCombinations, winnersOf } from './scoring.ts';
+import { bestFive, compareCombinations, round1Combination, winnersOf } from './scoring.ts';
 import {
   CATEGORIES,
   type BetAction,
@@ -15,31 +15,55 @@ import {
   type SeatCombination,
 } from './types.ts';
 
-const SAMPLES = 40_000;
+const ROUND1_SAMPLES = 40_000;
+const FINAL_SAMPLES = 20_000;
+// Percentage points. Straight flush and four of a kind in the Final are far below it: the test only
+// guards them against gross errors, the rest of the table is a real check.
 const TOLERANCE = 1.0;
 const SEED = 2026;
 
 type Odds = Record<Category, number>;
 
-// Spec §8, "player's best", in percent. Round 1: the best shown card with both table cards.
-const ROUND1_SPEC: Odds = { straightFlush: 0.6, three: 0.7, straight: 7.9, flush: 11.5, pair: 30.8, high: 48.5 };
+// Spec §8.1, "player's best", in percent. Round 1: the best shown card with both table cards, as a
+// three-card hand; the five-card-only categories never occur.
+const ROUND1_SPEC: Odds = {
+  straightFlush: 0.6,
+  four: 0,
+  fullHouse: 0,
+  flush: 11.5,
+  straight: 7.9,
+  three: 0.7,
+  twoPair: 0,
+  pair: 30.8,
+  high: 48.5,
+};
 
-// Spec §8, "player's best", in percent. Final: the best three among the four-card hand and the three table
-// cards. The third table card is drawn after the Round 1 pair, which leaves the distribution of three
-// random table cards unchanged.
-const FINAL_SPEC: Odds = { straightFlush: 6.5, three: 7.5, straight: 43.1, flush: 34.9, pair: 7.2, high: 0.8 };
+// Spec §8.2, "player's best", in percent. Final: the best five among the four-card hand and the three
+// table cards. The third table card is drawn after the Round 1 pair, which leaves the distribution of
+// three random table cards unchanged.
+const FINAL_SPEC: Odds = {
+  straightFlush: 0.03,
+  four: 0.16,
+  fullHouse: 2.6,
+  flush: 3.0,
+  straight: 4.2,
+  three: 4.8,
+  twoPair: 23.4,
+  pair: 44.2,
+  high: 17.7,
+};
 
 // Spec §8, "wins the round", in percent, with all 6 players revealing their best, plus the share of
 // rounds where the win is an exact tie.
 const WINS_SEATS = 6;
 type RoundOdds = { winner: Odds; ties: number };
 const ROUND1_WINS: RoundOdds = {
-  winner: { straightFlush: 3.3, three: 3.6, straight: 21.7, flush: 17.4, pair: 51.4, high: 2.7 },
+  winner: { straightFlush: 3.3, four: 0, fullHouse: 0, flush: 17.4, straight: 21.7, three: 3.6, twoPair: 0, pair: 51.4, high: 2.7 },
   ties: 31.8,
 };
 const FINAL_WINS: RoundOdds = {
-  winner: { straightFlush: 32.4, three: 25.8, straight: 41.0, flush: 0.9, pair: 0.0, high: 0.0 },
-  ties: 13.0,
+  winner: { straightFlush: 0.2, four: 1.0, fullHouse: 13.9, flush: 14.2, straight: 16.4, three: 14.9, twoPair: 33.2, pair: 6.2, high: 0.0 },
+  ties: 1.2,
 };
 
 type Best = (hand: Card[], table: Card[]) => Combination;
@@ -47,7 +71,7 @@ type Best = (hand: Card[], table: Card[]) => Combination;
 const bestShown: Best = (hand, table) => {
   let best: Combination | null = null;
   for (const card of hand) {
-    const candidate = bestCombination(card, table);
+    const candidate = round1Combination(card, table);
     if (best === null || compareCombinations(candidate, best) > 0) {
       best = candidate;
     }
@@ -59,44 +83,44 @@ const bestShown: Best = (hand, table) => {
 };
 
 const bestOfAll: Best = (hand, table) => {
-  const best = bestOfCards([...hand, ...table]);
+  const best = bestFive([...hand, ...table]);
   if (best === null) {
-    throw new Error('fewer than three cards');
+    throw new Error('fewer than five cards');
   }
   return best;
 };
 
 function emptyOdds(): Odds {
-  return { high: 0, pair: 0, flush: 0, straight: 0, three: 0, straightFlush: 0 };
+  return { high: 0, pair: 0, twoPair: 0, three: 0, straight: 0, flush: 0, fullHouse: 0, four: 0, straightFlush: 0 };
 }
 
-function toPercent(counts: Odds): Odds {
+function toPercent(counts: Odds, samples: number): Odds {
   const odds = emptyOdds();
   for (const category of CATEGORIES) {
-    odds[category] = (counts[category] / SAMPLES) * 100;
+    odds[category] = (counts[category] / samples) * 100;
   }
   return odds;
 }
 
-function measure(tableSize: number, handSize: number, best: Best): Odds {
+function measure(tableSize: number, handSize: number, best: Best, samples: number): Odds {
   const deck = fullDeck();
   const rng = mulberry32(SEED);
   const counts = emptyOdds();
-  for (let i = 0; i < SAMPLES; i += 1) {
+  for (let i = 0; i < samples; i += 1) {
     const shuffled = rng.shuffle(deck);
     const table = shuffled.slice(0, tableSize);
     const hand = shuffled.slice(tableSize, tableSize + handSize);
     counts[best(hand, table).category] += 1;
   }
-  return toPercent(counts);
+  return toPercent(counts, samples);
 }
 
-function measureWins(tableSize: number, handSize: number, best: Best): RoundOdds {
+function measureWins(tableSize: number, handSize: number, best: Best, samples: number): RoundOdds {
   const deck = fullDeck();
   const rng = mulberry32(SEED);
   const counts = emptyOdds();
   let ties = 0;
-  for (let i = 0; i < SAMPLES; i += 1) {
+  for (let i = 0; i < samples; i += 1) {
     const shuffled = rng.shuffle(deck);
     const table = shuffled.slice(0, tableSize);
     const entries: SeatCombination[] = Array.from({ length: WINS_SEATS }, (_, seat) => {
@@ -113,7 +137,7 @@ function measureWins(tableSize: number, handSize: number, best: Best): RoundOdds
       ties += 1;
     }
   }
-  return { winner: toPercent(counts), ties: (ties / SAMPLES) * 100 };
+  return { winner: toPercent(counts, samples), ties: (ties / samples) * 100 };
 }
 
 function expectOdds(measured: Odds, expected: Odds): void {
@@ -130,21 +154,21 @@ function expectWins(measured: RoundOdds, expected: RoundOdds): void {
 
 describe("player's best combination odds (spec §8)", () => {
   it('matches the spec table for Round 1, table 2, hand 3', () => {
-    expectOdds(measure(2, 3, bestShown), ROUND1_SPEC);
+    expectOdds(measure(2, 3, bestShown, ROUND1_SAMPLES), ROUND1_SPEC);
   });
 
   it('matches the spec table for the Final, table 3, hand 4', () => {
-    expectOdds(measure(3, 4, bestOfAll), FINAL_SPEC);
+    expectOdds(measure(3, 4, bestOfAll, FINAL_SAMPLES), FINAL_SPEC);
   });
 });
 
 describe('winning combination odds at 6 players (spec §8)', () => {
   it('matches the spec table for Round 1, every player showing their best card', () => {
-    expectWins(measureWins(2, 3, bestShown), ROUND1_WINS);
+    expectWins(measureWins(2, 3, bestShown, ROUND1_SAMPLES), ROUND1_WINS);
   });
 
   it('matches the spec table for the Final, every player holding 4 cards', () => {
-    expectWins(measureWins(3, 4, bestOfAll), FINAL_WINS);
+    expectWins(measureWins(3, 4, bestOfAll, FINAL_SAMPLES), FINAL_WINS);
   });
 });
 
