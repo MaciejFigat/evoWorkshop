@@ -17,6 +17,7 @@ const CONTENT_TYPES: Record<string, string> = {
   '.gif': 'image/gif',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.m4a': 'audio/mp4',
   '.ico': 'image/x-icon',
   '.map': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
