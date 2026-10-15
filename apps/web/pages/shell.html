@@ -167,7 +167,7 @@ main { max-width: 1360px; margin: 0 auto; padding: 28px 32px 80px; }
 
 /* Lobby */
 .top-games { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
-.side-games { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.side-games { display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .side-game { display: grid; grid-template-columns: 44% minmax(0, 1fr); border: 1px solid var(--rule); border-radius: var(--r-md); background: var(--surface); overflow: hidden; transition: border-color 140ms ease-out; }
 .side-game:hover { border-color: var(--rule-strong); }
 .side-game .cover { aspect-ratio: auto; height: 100%; min-height: 110px; }
@@ -479,7 +479,7 @@ table.data tr.clickable { cursor: pointer; }
 @media (max-width: 1100px) {
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .top-games { grid-template-columns: minmax(0, 1fr); }
-  .side-games { grid-template-rows: none; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .side-games { grid-template-rows: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .side-game { grid-template-columns: minmax(0, 1fr); }
   .side-game .cover { aspect-ratio: 16 / 10; height: auto; }
   .detail-head { grid-template-columns: minmax(0, 1fr); }
@@ -1020,6 +1020,9 @@ main:focus { outline: none; }
     { id: 'u22', name: 'Lina Berzina', role: 'Game Presenter', shift: 'night', activity: 0.75 },
     { id: 'u23', name: 'Oskar Holm', role: 'Engineering', shift: 'day', activity: 0.35 },
     { id: 'u24', name: 'Greta Liepa', role: 'Product', shift: 'day', activity: 0.45 },
+    { id: 'u25', name: 'Maksym Snitchuk', role: 'Engineering', shift: 'day', activity: 0.7 },
+    { id: 'u26', name: 'Magdalena Olczykowska', role: 'Engineering', shift: 'day', activity: 0.65 },
+    { id: 'u27', name: 'Maciej Figat', role: 'Engineering', shift: 'day', activity: 0.6 },
   ];
 
   const GAMES = [
@@ -1204,7 +1207,7 @@ main:focus { outline: none; }
     {
       id: 'alchemy-brawl',
       title: 'Alchemy Brawl',
-      authorId: 'u7',
+      authorId: 'u25',
       type: 'rng',
       core: null,
       format: 'demo',
@@ -1236,6 +1239,77 @@ main:focus { outline: none; }
       readme:
         '# Alchemy Brawl\n\nA multiplayer card game with its own tables on this server.\n\n## Play\nEnter a name, create a table or join one by its code, and add bots to fill the seats.\n\n## Rules\n- Everyone antes; 30% goes to Round 1, 70% to the Final.\n- Round 1: stay (turn one card face up) or skip. No betting, nothing is spent. Your shown card plus the two table cards make a three-card poker hand; the shown card stays in your hand, face up, until the hand ends.\n- Everyone draws a card, to 4. Final: a third table card joins the two from Round 1, then no-limit betting: fold, check, call, or raise to any amount from a minimum of 30; all-in is allowed and side pots are standard. All your cards play.\n- Showdown: the best five cards among your hand and the three table cards, ranked as a normal poker hand. Each round has its own ranking: a straight beats a flush in the three-card Round 1, a flush beats a straight in the five-card Final; 1 is always low.',
       video: { duration: '3:05', chapters: [['0:00', 'Create a table'], ['0:35', 'Round 1: stay or skip'], ['1:30', 'The Final and betting'], ['2:30', 'Bots']] },
+    },
+    {
+      id: 'warsaw-streets',
+      title: 'Warsaw Streets',
+      authorId: 'u26',
+      type: 'arcade',
+      core: null,
+      format: 'demo',
+      stage: 'prototype',
+      addedDaysAgo: 2,
+      updatedDaysAgo: 0,
+      version: '0.3.0',
+      cover: null,
+      demo: { kind: 'bench', path: 'games/warsaw-streets' },
+      popularity: 0.85,
+      avgMinutes: 4,
+      roundsPerMinute: 0,
+      rtp: null,
+      upvotes: 26,
+      ratings: [1, 2, 5, 10, 12],
+      tags: ['brawler', 'pixel art', 'break time'],
+      tagline: 'Early-90s beat \'em up: Nina against the mafia goons on the Vistula boulevard.',
+      description:
+        "Early-90s style side-scrolling beat 'em up: Nina against the mafia goons on the Vistula boulevard. Execution skill, no stakes: a feel experiment for the break-time arcade, not a candidate for embedding.",
+      passport: {
+        kind: 'Game',
+        randomness: 'Seeded PRNG from the host: enemy side, cooldowns, attack choice, camera shake',
+        decisions: 'Movement, attack chains, kick, special, jump, block (execution skill)',
+        roundFormat: 'Individual, one run is one round, 2–5 min',
+        business: 'None, internal break-time game',
+        embedding: 'C presentation only',
+        redFlags: 'Arcade look may appeal to children; execution skill keeps it out of gambling',
+      },
+      readme:
+        "# Warsaw Streets\n\nAn early-90s side-scrolling beat 'em up. Stage 1: Nina against three waves of mafia goons on the Vistula boulevard.\n\n## Controls\n- Move: `Arrows` or `WASD`\n- Punch combo `J`/`Z`, kick `K`/`X`, special `L`/`C`\n- Jump `Space`, block `Shift`, pause `P`, restart `R`\n\n## Notes\nPure arcade: no stakes, no money.",
+      video: null,
+    },
+    {
+      id: 'project-phlebas-coop',
+      title: 'Project Phlebas Co-op',
+      authorId: 'u27',
+      type: 'arcade',
+      core: null,
+      format: 'demo',
+      stage: 'prototype',
+      addedDaysAgo: 3,
+      updatedDaysAgo: 1,
+      version: '0.1.0',
+      cover: null,
+      demo: { kind: 'bench', path: 'games/project-phlebas-coop' },
+      popularity: 0.65,
+      avgMinutes: 9,
+      roundsPerMinute: 0,
+      rtp: null,
+      upvotes: 21,
+      ratings: [1, 2, 4, 9, 7],
+      tags: ['shooter', 'co-op', 'multiplayer'],
+      tagline: 'Two players, one shared wave: create a room, share the link, fight together.',
+      description:
+        '2-player co-op port of Project Phlebas: both ships fire the era\'s weapon at the same wave of enemies, with shared lives and score. Feel experiment, no core.',
+      passport: {
+        kind: 'Game',
+        randomness: 'One server seed per match, run in the host\'s browser',
+        decisions: 'Aiming and dodging (execution skill)',
+        roundFormat: 'Co-op room, 2 players, 5–10 min',
+        business: 'None, feel experiment',
+        embedding: 'C presentation only',
+        redFlags: 'Execution skill: not a candidate for embedding',
+      },
+      readme: '# Project Phlebas Co-op\n\nThe CS-history shooter for two.\n\n## Play\nCreate a room, send the share link to a colleague, ready up and fight the same waves together. Lives and score are shared.\n\n## Netcode\nHost-relay: the host\'s browser runs the simulation, the guest renders and sends input.',
+      video: null,
     },
     {
       id: 'skyline-crash',
@@ -2736,16 +2810,18 @@ main:focus { outline: none; }
       '<span class="site-foot-note">Prototype · your votes and sessions stay in this browser</span></div></footer>';
   }
 
-  const TRENDING_SIDE = ['alchemy-brawl', 'warsaw-streets', 'relic-rush'];
+  // Trending is pinned for the demo in this order: the first game is featured, the rest fill the side column.
+  // A pinned game missing from the catalog gives its slot back to the weekly ranking.
+  const TRENDING = ['alchemy-brawl', 'warsaw-streets', 'sunset-break', 'relic-rush', 'project-phlebas-coop'];
 
   function lobbyPage() {
     const games = visibleGames();
     const playable = games.filter((g) => g.format !== 'idea');
     const byWeek = playable.slice().sort((a, b) => gameStats(b.id, 7).sessions - gameStats(a.id, 7).sessions);
-    const featured = byWeek[0];
-    // The side column of Trending is pinned for the demo; a pinned game missing from the catalog gives its slot back to the weekly ranking.
-    const pinned = TRENDING_SIDE.map((id) => playable.find((g) => g.id === id)).filter((g) => g && g !== featured);
-    const side = pinned.concat(byWeek.filter((g) => g !== featured && !pinned.includes(g))).slice(0, 3);
+    const pinned = TRENDING.map((id) => playable.find((g) => g.id === id)).filter(Boolean);
+    const top = pinned.concat(byWeek.filter((g) => !pinned.includes(g))).slice(0, TRENDING.length);
+    const featured = top[0];
+    const side = top.slice(1);
     const shown = new Set([featured, ...side].filter(Boolean).map((g) => g.id));
     const latest = games.filter((g) => !shown.has(g.id)).sort((a, b) => a.addedDaysAgo - b.addedDaysAgo).slice(0, 4);
     latest.forEach((g) => shown.add(g.id));
@@ -2799,7 +2875,7 @@ main:focus { outline: none; }
       (featured
         ? '<section class="section" style="margin-top:28px">' + head('flame', 'Trending this week', '<a href="/library?sort=played">Most played →</a>') +
           '<div class="top-games">' +
-          '<article class="featured"><a href="/game/' + featured.id + '" class="cover" aria-label="' + esc(featured.title) + '">' + coverHtml(featured) + '</a><span class="featured-flag chip">' + icon('flame') + '#1 this week</span>' +
+          '<article class="featured"><a href="/game/' + featured.id + '" class="cover" aria-label="' + esc(featured.title) + '">' + coverHtml(featured) + '</a><span class="featured-flag chip">' + icon('flame') + 'Featured</span>' +
           '<div class="featured-body"><div><h3>' + esc(featured.title) + '</h3><div class="byline" style="margin-top:6px">' + avatar(userById(featured.authorId), 'sm') + '<b>' + esc(userById(featured.authorId).name) + '</b><span>· ' + fmt(fStats.sessions) + ' sessions, ' + fStats.players + ' players this week</span></div></div>' +
           '<div style="display:flex;gap:8px"><a class="btn" href="/game/' + featured.id + '">Details</a><button class="btn btn-primary" data-action="play" data-id="' + featured.id + '">' + PLAY + 'Play</button></div></div></article>' +
           '<div class="side-games">' + side.map(sideGame).join('') + '</div></div></section>'
