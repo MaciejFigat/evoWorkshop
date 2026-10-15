@@ -60,7 +60,7 @@ postMessage protocol below.
 
 Open http://localhost:5180, pick Alchemy Brawl in the library, enter a name, create a table
 or join one by its code, and add bots to fill the seats. Each browser tab is a separate
-player, and a reload keeps the seat. Rules: `games/alchemy-brawl/spec.md` (v0.3); passport:
+player, and a reload keeps the seat. Rules: `games/alchemy-brawl/spec.md` (v0.5); passport:
 `docs/passports/alchemy-brawl.md`.
 
 The rules in five lines:
@@ -68,19 +68,23 @@ The rules in five lines:
 1. Everyone antes 10 units; 30% of the antes make the Round 1 pot, 70% seed the Final pot.
    Each player gets 3 cards.
 2. Round 1: 2 table cards are turned up. Within 20 seconds everyone decides at once: stay
-   (cast a card face down and show another one) or skip. No betting. A lone stayer takes
-   the pot unrevealed; otherwise the stayers' casts flip together.
-3. Everyone draws 1 card.
-4. Final: 3 fresh table cards. Everyone casts a card face down, then fixed-limit betting
-   (bet 30, three bets per round: a bet and two raises). The last player standing, or the
-   best combination at the reveal, takes 70% of the antes plus all bets.
-5. A combination is your cast plus two table cards, ranked as a three-card poker hand:
-   straight flush, three of a kind, straight, flush, pair, high card. Equal combinations
-   split the pot. Every card you cast is spent.
+   (turn one card face up) or skip. No betting, nothing is spent. Choices stay hidden until
+   the window closes, then the stayers' shown cards go face up together. A lone stayer takes
+   the pot without a contest; if nobody stays, the pot rolls into the Final.
+3. Everyone draws 1 card, to 4. The shown card stays in the hand, face up, until the hand
+   ends.
+4. Final: 3 fresh table cards are turned up and fixed-limit betting starts at once (bet 30,
+   three bets per round: a bet and two raises). All your cards play. The last player
+   standing, or the best combination at the showdown, takes 70% of the antes plus all bets.
+5. In Round 1 a combination is your shown card plus the two table cards; in the Final it is
+   the best three cards among your whole hand and the three table cards. Both rank as a
+   three-card poker hand: straight flush, three of a kind, straight, flush, pair, high card.
+   Equal combinations split the pot. Nobody ever discards a card.
 
 Tables seat 3 to 11 players, 6 by default. The prototype plays play money, and stacks are
 topped up before every hand so that nobody goes all-in and there are no side pots. The time
-bank from the spec is not implemented: the action timer alone decides.
+bank from the spec is not implemented: the action timer alone decides. The table has a chat:
+a message goes to every human seat at the table, and bots never speak.
 
 ## Adding a game
 

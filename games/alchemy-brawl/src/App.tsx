@@ -1,6 +1,10 @@
 import { useState, useSyncExternalStore } from 'react';
+import { Chat } from './Chat';
+import { CombinationTable, activeCombination } from './CombinationTable';
 import { Lobby } from './Lobby';
-import type { Net } from './net';
+import type { Net, NetState } from './net';
+import { Rules } from './Rules';
+import { selection } from './selection';
 import { TableScreen } from './TableScreen';
 
 function NameForm({ net }: { net: Net }) {
@@ -22,25 +26,62 @@ function NameForm({ net }: { net: Net }) {
   );
 }
 
+// The name screen and the lobby share the table's shell: a slim top row, then the panels centred.
+function Welcome({ net, state }: { net: Net; state: NetState }) {
+  return (
+    <>
+      <header className="topbar">
+        <span className="topbar-title">Alchemy Brawl</span>
+        <span className="topbar-text muted">{state.name ?? ''}</span>
+        <span className={`dot ${state.status}`} title={state.status} />
+      </header>
+      <div className="centre-body">{state.name === null ? <NameForm net={net} /> : <Lobby net={net} tables={state.lobby} />}</div>
+    </>
+  );
+}
+
 export function App({ net }: { net: Net }) {
   const state = useSyncExternalStore(net.subscribe, net.getState);
+  const picked = useSyncExternalStore(selection.subscribe, selection.getState);
+  const table = state.name === null ? null : state.table;
+  const hand = table?.hand ?? null;
 
   return (
-    <main>
-      <header className="top">
-        <h1>Alchemy Brawl</h1>
-        <span className="muted">
-          {state.name ?? ''} · {state.status}
-        </span>
-      </header>
-      {state.error !== null && <p className="error">{state.error.replaceAll('_', ' ')}</p>}
-      {state.name === null ? (
-        <NameForm net={net} />
-      ) : state.table !== null ? (
-        <TableScreen net={net} table={state.table} receivedAt={state.receivedAt} />
-      ) : (
-        <Lobby net={net} tables={state.lobby} />
-      )}
+    <main className="shell">
+      <aside className="side">
+        <Chat net={net} lines={state.chat} playerId={state.playerId} enabled={table !== null} />
+      </aside>
+      <section className="centre">
+        {state.error !== null && <p className="error">{state.error.replaceAll('_', ' ')}</p>}
+        {table === null ? (
+          <Welcome net={net} state={state} />
+        ) : (
+          <TableScreen net={net} table={table} receivedAt={state.receivedAt} status={state.status} />
+        )}
+      </section>
+      <aside className="side">
+        {table === null ? (
+          <div className="panel">
+            <Rules />
+          </div>
+        ) : (
+          <>
+            <div className="panel hands">
+              <h3>Hands</h3>
+              <CombinationTable active={hand === null ? null : activeCombination(hand, picked)} />
+            </div>
+            <div className="panel history">
+              <h3>History</h3>
+              {state.history.length === 0 && <p className="muted">No hands finished yet.</p>}
+              <ul>
+                {[...state.history].reverse().map((line, i) => (
+                  <li key={`${state.history.length - i}-${line}`}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
+      </aside>
     </main>
   );
 }

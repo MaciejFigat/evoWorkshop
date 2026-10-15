@@ -1,20 +1,11 @@
 import { sameCard, type BetKind, type Card, type HandView, type TableView } from '@evo/alchemy-brawl/engine';
-import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { Net } from './net';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import type { Net, NetState } from './net';
+import { RoundStrip } from './RoundStrip';
+import { Rules } from './Rules';
 import { selection, type Selection } from './selection';
 import { PhaserTable } from './table/PhaserTable';
 import { cardName, describeCombination, finalText, nameResolver, round1Text } from './text';
-
-const TICK_MS = 200;
-
-function useSecondsLeft(timeLeftMs: number | null, receivedAt: number): number | null {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
-  return timeLeftMs === null ? null : Math.max(0, Math.ceil((receivedAt + timeLeftMs - now) / 1000));
-}
 
 // Chips the action adds to your round commitment: a call matches the level, a bet or raise goes one unit above it.
 function betAmount(hand: HandView, kind: BetKind): number {
@@ -35,137 +26,111 @@ function optionFor(hand: HandView, card: Card | null): string {
   return option === undefined ? '' : describeCombination(option.combination);
 }
 
-function DecideHud({ net, hand, picked }: { net: Net; hand: HandView; picked: Selection }) {
-  const ready = picked.cast !== null && picked.show !== null;
+// One frame of the action cluster under the table: a status line over the buttons, a hint under them.
+type Frame = { status: string; actions: ReactNode; hint: string };
+
+function Pill({ kind, amount, onClick, disabled = false }: { kind: string; amount?: number; onClick: () => void; disabled?: boolean }) {
+  const primary = kind === 'stay' || kind === 'call' || kind === 'check';
+  return (
+    <button
+      type="button"
+      className={`pill${primary ? ' primary' : ''}${kind === 'fold' ? ' quiet' : ''}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span>
+        {kind}
+        {amount !== undefined && amount > 0 && <small>{amount}</small>}
+      </span>
+    </button>
+  );
+}
+
+function decideFrame(net: Net, hand: HandView, picked: Selection): Frame {
+  const show = picked.show;
   const stay = (): void => {
-    if (picked.cast !== null && picked.show !== null) {
-      net.send({ type: 'decide', decision: { kind: 'stay', cast: picked.cast, show: picked.show } });
+    if (show !== null) {
+      net.send({ type: 'decide', decision: { kind: 'stay', show } });
       selection.clear();
     }
   };
-  return (
-    <>
-      <p className="prompt">Round 1: stay or skip. Click one card to cast, another to show.</p>
-      <p className="choice">
-        Cast: {picked.cast === null ? '—' : `${cardName(picked.cast)} (${optionFor(hand, picked.cast)})`} · Show:{' '}
-        {picked.show === null ? '—' : cardName(picked.show)}
-      </p>
-      <div className="bets">
-        <button type="button" disabled={!ready} onClick={stay}>
-          Stay
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            net.send({ type: 'decide', decision: { kind: 'skip' } });
-            selection.clear();
-          }}
-        >
-          Skip
-        </button>
-      </div>
-    </>
-  );
+  const skip = (): void => {
+    net.send({ type: 'decide', decision: { kind: 'skip' } });
+    selection.clear();
+  };
+  return {
+    status: 'Round 1: stay or skip. Click the card you will show.',
+    actions: (
+      <>
+        <Pill kind="stay" disabled={show === null} onClick={stay} />
+        <Pill kind="skip" onClick={skip} />
+      </>
+    ),
+    hint:
+      show === null
+        ? 'No chips at risk in Round 1. The shown card stays face up until the end of the hand.'
+        : `Show ${cardName(show)}: ${optionFor(hand, show)}. It stays face up until the end of the hand.`,
+  };
 }
 
-function Options({ hand }: { hand: HandView }) {
-  return (
-    <ul className="options">
-      {(hand.you?.options ?? []).map((entry) => (
-        <li key={`${entry.card.element}-${entry.card.power}`}>
-          <span>{cardName(entry.card)}</span>
-          <span className="muted">{describeCombination(entry.combination)}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
+const FINAL_STATUS = 'Final: all your cards play. Fixed-limit betting.';
 
-function BetHud({ net, table, hand }: { net: Net; table: TableView; hand: HandView }) {
+function betFrame(net: Net, table: TableView, hand: HandView): Frame {
   const you = hand.you;
   const nameOf = nameResolver(table, hand);
-  const cast = you?.pendingCast ?? null;
-  const yours = cast === null ? '' : `Your cast: ${cardName(cast)} · ${optionFor(hand, cast)}`;
   if (you === null || you.legalBets.length === 0) {
     const actor = hand.betting?.actor;
-    return (
-      <>
-        <p className="prompt">{actor === null || actor === undefined ? 'Betting' : `${nameOf(actor)} to act.`}</p>
-        <p className="muted">{yours}</p>
-      </>
-    );
+    return {
+      status: FINAL_STATUS,
+      actions: null,
+      hint: actor === null || actor === undefined ? '' : `${nameOf(actor)} to act.`,
+    };
   }
   const call = you.legalBets.includes('call') ? betAmount(hand, 'call') : 0;
   const rate = call > 0 ? ((call / (hand.finalPot + call)) * 100).toFixed(1) : null;
-  return (
-    <>
-      <p className="prompt">Your turn to bet.</p>
-      <p className="muted">{yours}</p>
-      <div className="bets">
-        {you.legalBets.map((kind) => {
-          const amount = betAmount(hand, kind);
-          return (
-            <button key={kind} type="button" onClick={() => net.send({ type: 'bet', kind })}>
-              {kind}
-              {amount > 0 ? ` ${amount}` : ''}
-            </button>
-          );
-        })}
-      </div>
-      {rate !== null && (
-        <p className="muted">
-          Call {call} into {hand.finalPot}: worth it if you win more than {rate}% of the time.
-        </p>
-      )}
-    </>
-  );
+  return {
+    status: `${FINAL_STATUS} Your turn.`,
+    actions: you.legalBets.map((kind) => (
+      <Pill key={kind} kind={kind} amount={betAmount(hand, kind)} onClick={() => net.send({ type: 'bet', kind })} />
+    )),
+    hint: rate === null ? '' : `Call ${call} into ${hand.finalPot}: worth it if you win more than ${rate}% of the time.`,
+  };
 }
 
-function Hud({ net, table, hand, picked }: { net: Net; table: TableView; hand: HandView; picked: Selection }) {
+function frameFor(net: Net, table: TableView, hand: HandView, picked: Selection): Frame {
   const you = hand.you;
   const nameOf = nameResolver(table, hand);
+  const idle = (status: string, hint = ''): Frame => ({ status, actions: null, hint });
   if (you === null) {
-    return <p className="prompt">Watching: you join from the next hand.</p>;
+    return { status: 'Watching: you join from the next hand.', actions: null, hint: '' };
   }
-  const me = hand.players[you.seat];
   switch (hand.phase) {
     case 'decide':
-      return you.canDecide ? (
-        <DecideHud net={net} hand={hand} picked={picked} />
-      ) : (
-        <p className="prompt">Locked in. Waiting for the window to close.</p>
-      );
+      return you.canDecide ? decideFrame(net, hand, picked) : idle('Locked in. Waiting for the window to close.');
     case 'round1End':
-      return <p className="prompt">{hand.round1 === null ? 'Round 1 over.' : round1Text(hand.round1, nameOf)}</p>;
-    case 'cast':
-      if (me?.folded === true) {
-        return <p className="prompt">You are out of this hand.</p>;
-      }
-      return you.canCast ? (
-        <>
-          <p className="prompt">Final: play a card face down. Click a card to cast it.</p>
-          <Options hand={hand} />
-        </>
-      ) : (
-        <p className="prompt">Locked in. Waiting for the others.</p>
-      );
+      return idle(hand.round1 === null ? 'Round 1 over.' : round1Text(hand.round1, nameOf));
     case 'bet':
-      return <BetHud net={net} table={table} hand={hand} />;
+      return betFrame(net, table, hand);
     case 'reveal':
-      return <p className="prompt">Reveal…</p>;
+      return idle('Showdown.');
     case 'done':
-      return (
-        <>
-          <p className="prompt">{hand.final === null ? 'Hand over.' : finalText(hand.final, nameOf)}</p>
-          <p className="muted">Next hand in a few seconds.</p>
-        </>
-      );
+      return idle(hand.final === null ? 'Hand over.' : finalText(hand.final, nameOf), 'Next hand in a few seconds.');
   }
 }
 
-export function TableScreen({ net, table, receivedAt }: { net: Net; table: TableView; receivedAt: number }) {
-  const secondsLeft = useSecondsLeft(table.timeLeftMs, receivedAt);
+export function TableScreen({
+  net,
+  table,
+  receivedAt,
+  status,
+}: {
+  net: Net;
+  table: TableView;
+  receivedAt: number;
+  status: NetState['status'];
+}) {
   const picked = useSyncExternalStore(selection.subscribe, selection.getState);
+  const [showRules, setShowRules] = useState(false);
   const hand = table.hand;
   const canDecide = hand?.you?.canDecide === true;
 
@@ -175,19 +140,23 @@ export function TableScreen({ net, table, receivedAt }: { net: Net; table: Table
     }
   }, [canDecide, table.handNo]);
 
+  const frame: Frame =
+    hand === null
+      ? { status: 'Waiting for the hand to start.', actions: null, hint: '' }
+      : frameFor(net, table, hand, picked);
+
   return (
-    <section className="table-screen">
-      <header className="table-bar">
-        <span>
-          Table <code>{table.code}</code> · {table.seats.length}/{table.maxPlayers} seats · hand {table.handNo}
+    <>
+      <header className="topbar">
+        <span className="topbar-text">
+          Table <code>{table.code}</code> · {table.seats.length}/{table.maxPlayers} · hand {table.handNo}
         </span>
-        {secondsLeft !== null && <span className="clock">{secondsLeft}s</span>}
+        <span className={`dot ${status}`} title={status} />
         <span className="spacer" />
-        <button
-          type="button"
-          disabled={table.seats.length >= table.maxPlayers}
-          onClick={() => net.send({ type: 'addBot' })}
-        >
+        <button type="button" onClick={() => setShowRules((open) => !open)}>
+          Rules
+        </button>
+        <button type="button" disabled={table.seats.length >= table.maxPlayers} onClick={() => net.send({ type: 'addBot' })}>
           Add bot
         </button>
         <button type="button" onClick={() => net.send({ type: 'leave' })}>
@@ -195,15 +164,34 @@ export function TableScreen({ net, table, receivedAt }: { net: Net; table: Table
         </button>
       </header>
 
-      <PhaserTable net={net} />
+      <div className="play">
+        <RoundStrip hand={hand} timeLeftMs={table.timeLeftMs} receivedAt={receivedAt} />
+        <div className="stage">
+          <PhaserTable net={net} />
+          {showRules && (
+            <div className="overlay" onClick={() => setShowRules(false)}>
+              <div className="panel" onClick={(e) => e.stopPropagation()}>
+                <Rules />
+                <button type="button" onClick={() => setShowRules(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
-      <footer className="hud">
-        {hand === null ? (
-          <p className="prompt">Waiting for the hand to start.</p>
-        ) : (
-          <Hud net={net} table={table} hand={hand} picked={picked} />
-        )}
-      </footer>
-    </section>
+        <footer className="hud">
+          <div className={`hud-actions${frame.actions === null ? ' no-actions' : ''}`}>
+            <span className="hud-status" title={frame.status}>
+              {frame.status}
+            </span>
+            <div className="hud-buttons">{frame.actions}</div>
+            <p className="hud-hint" title={frame.hint}>
+              {frame.hint}
+            </p>
+          </div>
+        </footer>
+      </div>
+    </>
   );
 }

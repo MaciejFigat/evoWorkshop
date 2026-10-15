@@ -1,8 +1,8 @@
 # Alchemy Brawl — Main Variant Specification
 
-**Version:** 0.3 (draft) · **Date:** 14 Oct 2026 · **Status:** round structure locked for the paper prototype · **Replaces:** §3–§8 of v0.1
+**Version:** 0.5 (draft) · **Date:** 14 Oct 2026 · **Status:** Round 1 shows a card, nothing is spent · **Replaces:** §2–§5, §8, §9 and the Appendix of v0.4
 
-> **Pitch.** Two rounds, one hidden card each, shared cards on the table. Your card plus two table cards make a three-card poker hand. Round 1 is a cheap gamble with no betting: stay and risk a card for a small share of the antes, or skip and keep it. The Final holds most of the money and the only betting.
+> **Pitch.** Two rounds, shared cards on the table. Round 1 is a free gamble with no betting: stay by turning one card face up for a small share of the antes, or skip and keep your hand hidden. Nobody ever discards a card. The Final holds most of the money and the only betting, and there every card you hold plays: your best three cards among your four and the three table cards.
 
 ---
 
@@ -28,12 +28,10 @@
 | Round 1 | First round. No betting. Worth 30% of the ante pot |
 | Final | Second round. The only betting round. Worth 70% of the ante pot plus all bets |
 | Table cards | Shared face-up cards in the center: 2 in Round 1, 3 in the Final, fresh each round |
-| Cast | The one card from your hand you play in a round, face down until the reveal |
-| Combination | Your cast plus two table cards, ranked as a three-card poker hand (§5) |
-| Stay / skip | Round 1 decision. Stay: cast a card for the Round 1 pot (it is spent) and show another card. Skip: play nothing this round |
-| Shown card | A card a Round 1 stayer turns face up. It stays in their hand, visible to everyone until the end of the hand |
-| Reveal | The casts of everyone still contesting flip at the same time |
-| Spent | Every card cast in a round leaves play after that round, the winner's included |
+| Shown card | The Round 1 play: the one card a stayer turns face up. It plays for the Round 1 pot, stays in their hand and is visible to everyone until the end of the hand |
+| Combination | A three-card poker hand (§5). Round 1: your shown card plus both table cards. Final: the best three cards among your hand and the three table cards |
+| Stay / skip | Round 1 decision. Stay: show one card for the Round 1 pot. Skip: show nothing this round |
+| Show | Round 1: when the window closes, the shown cards of everyone who stayed go face up at the same time. Final: every remaining player's hand is shown |
 
 ---
 
@@ -41,11 +39,11 @@
 
 1. Everyone antes. 30% of the antes go to Round 1, 70% to the Final.
 2. You get 3 cards. Each round starts with table cards turned face up: 2 in Round 1, 3 in the Final.
-3. Your card plus two table cards make a three-card poker hand: straight flush, three of a kind, straight, flush, pair, high card.
-4. Round 1 has no bets. Within 20 seconds everyone decides at once: stay (play a card face down and show another one) or skip. If you're the only one who stays, you take the pot without revealing.
-5. Everyone draws 1 card. In the Final, everyone plays a card face down, then there is fixed-limit betting.
-6. The best combination wins the round's pot. Equal combinations split it.
-7. Every card you play is spent. If you skip Round 1, your cards stay in your hand.
+3. Three cards make a poker hand: straight flush, three of a kind, straight, flush, pair, high card.
+4. Round 1 has no bets. Within 20 seconds everyone decides at once: stay (turn one card face up) or skip. Your shown card plus both table cards is your combination. If you're the only one who stays, you take the pot.
+5. Nobody discards anything: the shown card stays in your hand, face up, until the hand ends.
+6. Everyone draws 1 card, to 4. In the Final all your cards play: fixed-limit betting, then the best three cards among your hand and the three table cards.
+7. The best combination wins the round's pot. Equal combinations split it.
 
 ---
 
@@ -62,43 +60,43 @@
 
 1. **Table** — turn up 2 table cards.
 2. **Decide** — one simultaneous window of 20 seconds. Each player either:
-   - **stays**: picks a card to cast face down **and** picks one other card from their hand to show face up; or
-   - **skips**: plays nothing.
+   - **stays**: picks one card from their hand to show face up; or
+   - **skips**: shows nothing.
 
-   Choices are locked when made and hidden until the window closes. On timeout the player skips.
-3. **Show** — when the window closes, everyone sees who stayed and each stayer's shown card. Shown cards stay in their owners' hands, face up until the end of the hand, and can be cast in the Final.
+   Choices are locked when made and hidden until the window closes: the other seats see only that a player has decided. On timeout the player skips.
+3. **Show** — when the window closes, everyone sees who stayed and each stayer's shown card. Shown cards stay in their owners' hands, face up until the end of the hand, and play in the Final.
 4. **Resolve:**
    - No stayers: the Round 1 pot rolls into the Final pot.
-   - One stayer: takes the Round 1 pot. Their cast is discarded face down, unrevealed.
-   - Two or more stayers: their casts are revealed. The best combination (§5) takes the Round 1 pot; equal best combinations split it.
-5. **Spend** — every stayer's cast leaves play. The Round 1 table cards are discarded.
+   - One stayer: takes the Round 1 pot without a contest.
+   - Two or more stayers: each stayer's combination is their shown card plus both table cards. The best combination (§5) takes the Round 1 pot; equal best combinations split it.
+
+   Nothing is spent: every player keeps all 3 cards. The Round 1 table cards are discarded.
 
 ### 4.3 Draw
 
-Every player draws 1 card. Players who stayed in Round 1 now hold 3 cards; players who skipped hold 4.
+Every player draws 1 card. Everyone now holds 4 cards, whether they stayed or skipped.
 
 ### 4.4 Final
 
-1. **Table** — turn up 3 fresh table cards.
-2. **Cast** — everyone simultaneously places one card face down, under the cast timer.
-3. **Betting** — fixed limit (§6). A player who folds is out of the hand; their cast is discarded unrevealed.
-4. **Reveal and resolve:**
-   - If only one player is left after betting, they win the Final pot without a reveal.
-   - Otherwise the remaining casts flip together. The best combination takes the Final pot; equal best combinations split it.
-5. **Payout** — the Final pot holds 70% of the antes, all bets and any Round 1 rollover.
+1. **Table** — turn up 3 fresh table cards. Every card in your hand plays.
+2. **Betting** — fixed limit (§6), starting at once with the first player clockwise from the button. A player who folds is out of the hand; their hand stays hidden.
+3. **Showdown:**
+   - If only one player is left after betting, they win the Final pot without showing anything.
+   - Otherwise every remaining player's whole hand is shown. Each player's combination is the best three cards among their hand and the three table cards (§5); the three table cards alone may be that best. The best combination takes the Final pot; equal best combinations split it.
+4. **Payout** — the Final pot holds 70% of the antes, all bets and any Round 1 rollover.
 
 ### 4.5 Round summary
 
 | | Round 1 | Final |
 |---|---|---|
-| Hand at the decision | 3 | 3 (stayed in Round 1) or 4 (skipped) |
+| Hand at the decision | 3 | 4 |
 | Table cards | 2 | 3 |
-| Your combination | Cast + both table cards | Cast + the best two of the three table cards |
-| Decision | Stay (cast + show a card) or skip, all at once | Check, bet, call, raise, fold, in turn |
-| Chips at risk | None; you risk a card | Fixed-limit bets |
+| Your combination | Shown card + both table cards | Best three cards among your hand and the three table cards |
+| Decision | Stay (show one card) or skip, all at once | Check, bet, call, raise, fold, in turn |
+| Chips at risk | None; you give away information | Fixed-limit bets |
 | Pot | 30% of the antes | 70% of the antes + bets + rollover |
-| Reveal | Only if 2+ players stay | Only if 2+ players remain |
-| Bluff | Stay alone with a weak card; choose what card to show | Standard betting bluff, supported by your shown card |
+| Shown | The stayers' shown cards, once the window closes | Hands shown if 2+ players remain |
+| Bluff | Stay alone with a weak card; choose which card to show | Standard betting bluff, supported by your shown card |
 
 ### 4.6 Odd chips
 
@@ -112,7 +110,10 @@ The button moves one seat clockwise. Nothing carries over between hands.
 
 ## 5. Combinations
 
-Your combination is always **your cast plus exactly two table cards**. In the Final you use the best two of the three table cards. You can't play the table cards alone.
+A combination is always exactly three cards.
+
+- **Round 1:** your shown card plus both table cards. One shown card, one combination.
+- **Final:** the best three cards among your four cards and the three table cards. Any three of them count, so the board may play: if the three table cards make the best combination, every remaining player holds at least that.
 
 Ranking, as in three-card poker, highest first:
 
@@ -127,17 +128,20 @@ Ranking, as in three-card poker, highest first:
 
 - Powers run 1 to 13 with no wrap: 1-2-3 is the lowest straight, 11-12-13 the highest, 12-13-1 is not a straight.
 - Elements have no order. Combinations that are equal under the table above split the pot.
-- A straight ranks above a flush because, with these table counts, a player makes a straight less often than a flush (§8).
+- A straight ranks above a flush, as in three-card poker. In Round 1 a player makes a straight less often than a flush; in the Final, with 7 cards to choose from, a player makes a straight more often than a flush (§8). See §9.
 
 ```text
-best_combination(cast, table):
-    return max(rank(cast, a, b) for each pair (a, b) of table cards)
+round1_combination(shown, table):
+    return rank(shown, table[0], table[1])
+
+best_of(cards):                                  # Final: cards = hand + the three table cards
+    return max(rank(x, y, z) for each triple (x, y, z) of cards)
 
 rank(x, y, z):
     returns (category, comparison values) as in the table above
 
 winner(contestants):
-    best = max(best_combination(c.cast, table) for c in contestants)
+    best = max(c.combination for c in contestants)
     return all contestants whose combination equals best    # split if more than one
 ```
 
@@ -166,7 +170,6 @@ winner(contestants):
 |---|---|
 | Seats | 3–11; 6-max is the main format |
 | Round 1 decision window | 20 s, simultaneous; on timeout, skip |
-| Final cast timer | 12 s; on timeout the lowest-power card in hand is cast |
 | Action timer | 10 s + 20 s time bank; on timeout check if possible, otherwise fold |
 | Target | Median hand ≤ 90 s at 6 players (to validate in the prototype) |
 
@@ -182,19 +185,21 @@ winner(contestants):
 
 ## 8. Combination odds
 
-Monte Carlo, 40,000 rounds, 6 players. "Player's best" is how often a player can make that combination as their best with the cards they hold. "Wins the round" is the winning combination when all 6 players reveal their best, so it is an upper bound for real rounds, where some players skip or fold.
+Monte Carlo, 40,000 rounds each, seed fixed, reproduced by the engine's simulation test. "Player's best" is how often a player's best combination falls in that category with the cards they hold. "Wins the round" is the category of the winning combination when all 6 players reveal their best, so it is an upper bound for real rounds, where some players skip or fold.
 
-| Combination | Round 1, table 2, hand 3: player's best | Round 1: wins the round | Final, table 3, hand 3: player's best | Final: wins the round | Final, table 3, hand 4: player's best | Final: wins the round |
-|---|---|---|---|---|---|---|
-| Straight flush | 0.6% | 3.3% | 1.8% | 9.7% | 2.4% | 12.2% |
-| Three of a kind | 0.7% | 3.6% | 2.1% | 9.7% | 2.7% | 11.7% |
-| Straight | 7.9% | 21.7% | 20.2% | 47.1% | 25.0% | 47.3% |
-| Flush | 11.5% | 17.4% | 24.7% | 20.3% | 27.3% | 17.7% |
-| Pair | 30.8% | 51.4% | 31.2% | 13.1% | 29.6% | 11.2% |
-| High card | 48.5% | 2.7% | 20.1% | 0.1% | 13.0% | 0.0% |
-| **Exact ties for the win** | | **31.8%** | | **30.1%** | | **39.9%** |
+The Final is measured at 6 players, each holding 4 cards, the only shape the round structure produces now that nothing is spent.
 
-**Known issue — ties.** Each player owns only one card in the combination and the table is shared, so two players holding the same power usually make identical combinations. With all 6 players revealing, about a third of rounds end in a split. Real rounds will split less often, because fewer players reveal; the prototype has to measure the real rate.
+| Combination | Round 1, table 2, hand 3: player's best | Round 1: wins the round | Final, table 3, hand 4: player's best | Final: wins the round (6 × hand 4) |
+|---|---|---|---|---|
+| Straight flush | 0.6% | 3.3% | 6.5% | 32.4% |
+| Three of a kind | 0.7% | 3.6% | 7.5% | 25.8% |
+| Straight | 7.9% | 21.7% | 43.1% | 41.0% |
+| Flush | 11.5% | 17.4% | 34.9% | 0.9% |
+| Pair | 30.8% | 51.4% | 7.2% | 0.0% |
+| High card | 48.5% | 2.7% | 0.8% | 0.0% |
+| **Exact ties for the win** | | **31.8%** | | **13.0%** |
+
+**Known issue — ties.** In Round 1 each player owns only one card in the combination and the table is shared, so two players holding the same power usually make identical combinations: with all 6 players revealing, about a third of Round 1 reveals end in a split. The Final splits far less often, 13.0% with all 6 revealing, mostly on shared straights. Real rounds will split less often, because fewer players reveal; the prototype has to measure the real rate.
 
 ---
 
@@ -207,6 +212,8 @@ Monte Carlo, 40,000 rounds, 6 players. "Player's best" is how often a player can
 5. Round names, and poker names or alchemy names for the combinations.
 6. Heads-up tables: launch later or tune separately.
 7. Bot simulation of betting and bluffing under these rules, to set reference numbers.
+8. Staying costs only information: a stayer risks no chips and no card, only the knowledge of one card in their hand. Validate in the prototype whether players stay too often for Round 1 to be a decision at all; if so, a price for staying (a card, a chip) goes back on the table.
+9. Straight above flush: in the Final a 4-card hand makes a straight more often than a flush (§8), which contradicts the three-card poker reason for the order. Either keep the familiar order or swap the two for the Final; a swap changes the engine ranking and the odds table.
 
 ---
 
@@ -219,19 +226,22 @@ Monte Carlo, 40,000 rounds, 6 players. "Player's best" is how often a player can
 **Round 1.** Table: 10 Air, 11 Earth. A 9 or a 12 makes a straight; a 10 or an 11 makes a pair.
 
 - Within the 20-second window, at the same time:
-  - Boris stays, casts 3 Earth and shows 12 Water. He hopes to be alone; the shown 12 suggests he could hold a straight.
-  - Vera stays, casts 9 Air and shows 6 Water.
-  - Gleb and Ana skip. Ana keeps her 12 Earth for the Final.
-- The window closes: everyone sees that Boris and Vera stayed, and their shown cards.
-- Reveal: Boris has high card (11-10-3), Vera a straight (9-10-11). Vera takes 12 and covers her ante. Boris's bluff failed: in a simultaneous decision he couldn't know Vera would stay.
+  - Boris stays and shows 3 Earth. Showing the 12 would make a straight, but it would also tell the table what he holds; with the 3 he wins only if he is alone, and staying costs him nothing but that one card's secret.
+  - Vera stays and shows 9 Air.
+  - Gleb and Ana skip. Ana keeps her 12 Earth hidden for the Final.
+- The window closes: everyone sees that Boris and Vera stayed, and their shown cards. Boris has high card (11-10-3), Vera a straight (9-10-11). Vera takes 12 and covers her ante. Boris's bluff failed: in a simultaneous decision he couldn't know Vera would stay.
+- Nothing is spent. Boris still holds 3 Earth (face up), 10 Fire, 12 Water; Vera holds 6 Water, 13 Earth, 9 Air (face up).
 
-**Draw.** Boris: 10 Fire, 12 Water (shown), 5 Fire. Vera: 13 Earth, 6 Water (shown), 7 Water. Gleb: 2 Fire, 11 Air, 5 Water, 4 Fire. Ana: 7 Fire, 12 Earth, 13 Air, 1 Earth.
+**Draw.** Everyone draws to 4. Boris: 3 Earth (shown), 10 Fire, 12 Water, 5 Fire. Vera: 6 Water, 13 Earth, 9 Air (shown), 7 Water. Gleb: 2 Fire, 11 Air, 5 Water, 8 Water. Ana: 7 Fire, 12 Earth, 13 Air, 1 Water.
 
-**Final.** Table: 3 Fire, 6 Fire, 9 Earth.
+**Final.** Table: 3 Fire, 6 Fire, 9 Earth. Everyone's whole hand plays with the table.
 
-- Casts: Boris 10 Fire, Vera 6 Water, Gleb 4 Fire, Ana 7 Fire.
-- Their best combinations: Boris a Fire flush 10-6-3, Ana a Fire flush 7-6-3, Gleb a Fire flush 6-4-3, Vera a pair of 6s.
-- Betting: Boris bets 30, Vera and Gleb call. Ana reads Boris as weak, because his shown card, 12 Water, doesn't fit a Fire table, and raises to 60. Boris raises to 90 (the cap). Vera and Gleb fold, Ana calls. Final pot: 28 + 30 + 30 + 90 + 90 = 268.
-- Reveal: Boris's flush 10-6-3 beats Ana's flush 7-6-3. Boris takes 268.
+- The card sets and the best three of each:
+  - Boris: 3 Earth, 10 Fire, 12 Water, 5 Fire + 3 Fire, 6 Fire, 9 Earth → Fire flush 10-6-5 (the pair of 3s is weaker).
+  - Vera: 6 Water, 13 Earth, 9 Air, 7 Water + table → pair of 9s with a 13.
+  - Gleb: 2 Fire, 11 Air, 5 Water, 8 Water + table → Fire flush 6-3-2.
+  - Ana: 7 Fire, 12 Earth, 13 Air, 1 Water + table → Fire flush 7-6-3.
+- Betting: Boris bets 30, Vera and Gleb call. Ana reads Boris as weak, because his shown card, 3 Earth, doesn't fit a Fire table, and raises to 60. Boris raises to 90 (the cap). Vera and Gleb fold, Ana calls. Final pot: 28 + 30 + 30 + 90 + 90 = 268.
+- Showdown: Boris and Ana show their hands; Vera's and Gleb's stay hidden. Boris's flush 10-6-5 beats Ana's flush 7-6-3. Boris takes 268.
 
 **Result.** Boris +168, Vera −28, Gleb −40, Ana −100. Boris's shown card did its job in the Final: it was real, but it pointed the table away from his actual hand.

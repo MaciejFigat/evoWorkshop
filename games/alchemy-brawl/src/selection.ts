@@ -1,10 +1,10 @@
 import { sameCard, type Card } from '@evo/alchemy-brawl/engine';
 
-// The Round 1 choice in progress: the first clicked card is the cast, the second one the card to show.
+// The Round 1 choice in progress: the card you will show. Clicking it again clears the pick.
 // Both React (the HUD) and the Phaser scene read it, so it lives outside either tree.
-export type Selection = { cast: Card | null; show: Card | null };
+export type Selection = { show: Card | null };
 
-const EMPTY: Selection = { cast: null, show: null };
+const EMPTY: Selection = { show: null };
 const listeners = new Set<() => void>();
 let state: Selection = EMPTY;
 
@@ -20,16 +20,7 @@ export const selection = {
     return () => listeners.delete(listener);
   },
   pick: (card: Card): void => {
-    const { cast, show } = state;
-    if (cast === null) {
-      set(show !== null && sameCard(show, card) ? { cast: card, show: null } : { cast: card, show });
-    } else if (sameCard(cast, card)) {
-      set({ cast: null, show });
-    } else if (show !== null && sameCard(show, card)) {
-      set({ cast, show: null });
-    } else {
-      set({ cast, show: card });
-    }
+    set(state.show !== null && sameCard(state.show, card) ? EMPTY : { show: card });
   },
   clear: (): void => {
     if (state !== EMPTY) {

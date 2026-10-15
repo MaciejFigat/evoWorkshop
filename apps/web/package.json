@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=../../.env --watch-path=src --watch-path=../../games/alchemy-brawl/tables --watch-path=../../games/alchemy-brawl/engine --watch-path=../../games/project-phlebas-coop/logic --watch-path=../../games/project-phlebas-coop/shared --disable-warning=ExperimentalWarning src/server/main.ts",
-    "start": "NODE_ENV=production node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning src/server/main.ts",
+    "dev": "node --watch-path=src --watch-path=../../games/alchemy-brawl/tables --watch-path=../../games/alchemy-brawl/engine --watch-path=../../games/project-phlebas-coop/logic --watch-path=../../games/project-phlebas-coop/shared --disable-warning=ExperimentalWarning src/server/main.ts",
+    "start": "NODE_ENV=production node --disable-warning=ExperimentalWarning src/server/main.ts",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "test": "vitest run"

@@ -1,6 +1,6 @@
-import { ELEMENTS, sameCard, type Card } from './cards.ts';
+import { sameCard, type Card } from './cards.ts';
 import { MIN_PLAYERS, round1Pot, type Rules } from './config.ts';
-import { bestCombination, winnersOf } from './scoring.ts';
+import { bestCombination, bestOfCards, winnersOf } from './scoring.ts';
 import type {
   BetKind,
   Decision,
@@ -10,6 +10,7 @@ import type {
   HandState,
   Round1Result,
   SeatCard,
+  SeatCards,
   SeatCombination,
   StepError,
   StepResult,
@@ -44,7 +45,6 @@ export function startHand(rules: Rules, seats: SeatStake[], button: number, deck
       hand: [],
       decision: null,
       shown: null,
-      pendingCast: null,
       folded: false,
       committed: rules.ante,
       roundCommitted: 0,
@@ -84,20 +84,6 @@ export function legalBets(state: HandState, seat: number): BetKind[] {
   return betting.level === player.roundCommitted ? ['check', ...raise] : ['fold', 'call', ...raise];
 }
 
-export function lowestCard(hand: Card[]): Card | null {
-  let lowest: Card | null = null;
-  for (const card of hand) {
-    if (
-      lowest === null ||
-      card.power < lowest.power ||
-      (card.power === lowest.power && ELEMENTS.indexOf(card.element) < ELEMENTS.indexOf(lowest.element))
-    ) {
-      lowest = card;
-    }
-  }
-  return lowest;
-}
-
 export function activeOrder(state: HandState, start: number): number[] {
   return seatsFrom(state, start).filter((seat) => state.players[seat]?.folded === false);
 }
@@ -111,8 +97,6 @@ function apply(state: HandState, action: HandAction, events: HandEvent[]): StepE
   switch (action.type) {
     case 'decide':
       return decide(state, action.seat, action.decision, events);
-    case 'cast':
-      return cast(state, action.seat, action.card, events);
     case 'bet':
       return bet(state, action.seat, action.kind, events);
     case 'timeout':
@@ -180,17 +164,12 @@ function decide(state: HandState, seat: number, decision: Decision, events: Hand
   if (decision.kind === 'skip') {
     player.decision = decision;
   } else {
-    const castIndex = player.hand.findIndex((held) => sameCard(held, decision.cast));
-    const castCard = player.hand[castIndex];
     const showCard = player.hand.find((held) => sameCard(held, decision.show));
-    if (castCard === undefined || showCard === undefined) {
+    if (showCard === undefined) {
       return 'card_not_in_hand';
     }
-    if (sameCard(castCard, showCard)) {
-      return 'same_card';
-    }
-    player.hand.splice(castIndex, 1);
-    player.decision = { kind: 'stay', cast: castCard, show: showCard };
+    // The shown card stays in the hand: staying costs information, never a card.
+    player.decision = { kind: 'stay', show: showCard };
     player.shown = showCard;
   }
   events.push({ type: 'decisionLocked', seat });
@@ -204,36 +183,27 @@ function resolveRound1(state: HandState, events: HandEvent[]): void {
   const pot = state.round1Pot;
   const stayers: number[] = [];
   const shown: SeatCard[] = [];
-  const casts: SeatCard[] = [];
   state.players.forEach((player, seat) => {
     if (player.decision?.kind === 'stay') {
       stayers.push(seat);
       shown.push({ seat, card: player.decision.show });
-      casts.push({ seat, card: player.decision.cast });
     }
   });
   let result: Round1Result;
   const base = { table: [...state.table], pot, stayers, shown };
   if (stayers.length === 0) {
     state.finalPot += pot;
-    result = {
-      ...base,
-      casts: [],
-      combinations: [],
-      winners: [],
-      payouts: state.players.map(() => 0),
-      rolledOver: true,
-    };
+    result = { ...base, combinations: [], winners: [], payouts: state.players.map(() => 0), rolledOver: true };
   } else if (stayers.length === 1) {
     const winners = [...stayers];
-    result = { ...base, casts: [], combinations: [], winners, payouts: payOut(state, pot, winners), rolledOver: false };
+    result = { ...base, combinations: [], winners, payouts: payOut(state, pot, winners), rolledOver: false };
   } else {
-    const combinations = casts.map((entry) => ({
+    const combinations = shown.map((entry) => ({
       seat: entry.seat,
       combination: bestCombination(entry.card, state.table),
     }));
     const winners = winnersOf(combinations);
-    result = { ...base, casts, combinations, winners, payouts: payOut(state, pot, winners), rolledOver: false };
+    result = { ...base, combinations, winners, payouts: payOut(state, pot, winners), rolledOver: false };
   }
   state.round1Pot = 0;
   state.round1 = result;
@@ -241,6 +211,7 @@ function resolveRound1(state: HandState, events: HandEvent[]): void {
   events.push({ type: 'round1Resolved', result });
 }
 
+// Everyone draws to four cards, the three table cards go up and betting starts at once.
 function startFinal(state: HandState, events: HandEvent[]): StepError | null {
   for (const seat of activeOrder(state, state.button + 1)) {
     const error = drawCard(state, seat);
@@ -252,38 +223,9 @@ function startFinal(state: HandState, events: HandEvent[]): StepError | null {
   if (error !== null) {
     return error;
   }
-  state.phase = 'cast';
+  state.phase = 'bet';
+  state.betting = { level: 0, bets: 0, toAct: activeOrder(state, state.button + 1) };
   events.push({ type: 'finalStarted', table: [...state.table] });
-  return null;
-}
-
-function cast(state: HandState, seat: number, card: Card, events: HandEvent[]): StepError | null {
-  if (state.phase !== 'cast') {
-    return 'wrong_phase';
-  }
-  const player = state.players[seat];
-  if (player === undefined) {
-    return 'unknown_seat';
-  }
-  if (player.folded) {
-    return 'folded';
-  }
-  if (player.pendingCast !== null) {
-    return 'already_cast';
-  }
-  const index = player.hand.findIndex((held) => sameCard(held, card));
-  const held = player.hand[index];
-  if (held === undefined) {
-    return 'card_not_in_hand';
-  }
-  player.hand.splice(index, 1);
-  player.pendingCast = held;
-  events.push({ type: 'castLocked', seat });
-  const waiting = activeOrder(state, 0).some((s) => state.players[s]?.pendingCast === null);
-  if (!waiting) {
-    state.phase = 'bet';
-    state.betting = { level: 0, bets: 0, toAct: activeOrder(state, state.button + 1) };
-  }
   return null;
 }
 
@@ -305,7 +247,6 @@ function bet(state: HandState, seat: number, kind: BetKind, events: HandEvent[])
   let amount = 0;
   if (kind === 'fold') {
     player.folded = true;
-    player.pendingCast = null;
     betting.toAct.shift();
   } else {
     const aggressive = kind === 'bet' || kind === 'raise';
@@ -328,7 +269,7 @@ function bet(state: HandState, seat: number, kind: BetKind, events: HandEvent[])
 
   const [last, ...others] = activeOrder(state, 0);
   if (last !== undefined && others.length === 0) {
-    finish(state, { reason: 'fold', casts: [], combinations: [], winners: [last] }, events);
+    finish(state, { reason: 'fold', hands: [], combinations: [], winners: [last] }, events);
     return null;
   }
   if (betting.toAct.length === 0) {
@@ -346,19 +287,6 @@ function timeout(state: HandState, events: HandEvent[]): StepError | null {
       }
     }
     resolveRound1(state, events);
-    return null;
-  }
-  if (state.phase === 'cast') {
-    for (const seat of activeOrder(state, state.button + 1)) {
-      const player = state.players[seat];
-      const card = player === undefined || player.pendingCast !== null ? null : lowestCard(player.hand);
-      if (card !== null) {
-        const error = cast(state, seat, card, events);
-        if (error !== null) {
-          return error;
-        }
-      }
-    }
     return null;
   }
   if (state.phase === 'bet' && state.betting !== null) {
@@ -382,21 +310,22 @@ function advance(state: HandState, events: HandEvent[]): StepError | null {
   return 'wrong_phase';
 }
 
+// Every remaining hand is shown whole; the combination is the best three among hand and table.
 function showdown(state: HandState, events: HandEvent[]): void {
-  const casts: SeatCard[] = [];
+  const hands: SeatCards[] = [];
   state.players.forEach((player, seat) => {
-    if (!player.folded && player.pendingCast !== null) {
-      casts.push({ seat, card: player.pendingCast });
+    if (!player.folded) {
+      hands.push({ seat, cards: [...player.hand] });
     }
   });
-  const combinations: SeatCombination[] = casts.map((entry) => ({
-    seat: entry.seat,
-    combination: bestCombination(entry.card, state.table),
-  }));
-  finish(state, { reason: 'showdown', casts, combinations, winners: winnersOf(combinations) }, events);
+  const combinations: SeatCombination[] = hands.flatMap((entry) => {
+    const combination = bestOfCards([...entry.cards, ...state.table]);
+    return combination === null ? [] : [{ seat: entry.seat, combination }];
+  });
+  finish(state, { reason: 'showdown', hands, combinations, winners: winnersOf(combinations) }, events);
 }
 
-type Settlement = Pick<FinalResult, 'reason' | 'casts' | 'combinations' | 'winners'>;
+type Settlement = Pick<FinalResult, 'reason' | 'hands' | 'combinations' | 'winners'>;
 
 function finish(state: HandState, settlement: Settlement, events: HandEvent[]): void {
   const pot = state.finalPot;

@@ -49,9 +49,7 @@ const SERVER_ERRORS = [
   'unknown_seat',
   'folded',
   'already_decided',
-  'already_cast',
   'card_not_in_hand',
-  'same_card',
   'not_your_turn',
   'illegal_bet',
   'insufficient_stack',
@@ -70,11 +68,12 @@ export const CardSchema: z.ZodType<Card> = z.object({
 });
 
 const DecisionSchema: z.ZodType<Decision> = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('stay'), cast: CardSchema, show: CardSchema }),
+  z.object({ kind: z.literal('stay'), show: CardSchema }),
   z.object({ kind: z.literal('skip') }),
 ]);
 
 const SeatCardSchema = z.object({ seat: z.number().int(), card: CardSchema });
+const SeatCardsSchema = z.object({ seat: z.number().int(), cards: z.array(CardSchema) });
 
 const CombinationSchema: z.ZodType<Combination> = z.object({
   category: z.enum(CATEGORIES),
@@ -89,7 +88,6 @@ const Round1ResultSchema: z.ZodType<Round1Result> = z.object({
   pot: z.number().int(),
   stayers: z.array(z.number().int()),
   shown: z.array(SeatCardSchema),
-  casts: z.array(SeatCardSchema),
   combinations: z.array(SeatCombinationSchema),
   winners: z.array(z.number().int()),
   payouts: z.array(z.number().int()),
@@ -100,7 +98,7 @@ const FinalResultSchema: z.ZodType<FinalResult> = z.object({
   reason: z.enum(['fold', 'showdown']),
   table: z.array(CardSchema),
   pot: z.number().int(),
-  casts: z.array(SeatCardSchema),
+  hands: z.array(SeatCardsSchema),
   combinations: z.array(SeatCombinationSchema),
   winners: z.array(z.number().int()),
   payouts: z.array(z.number().int()),
@@ -111,13 +109,12 @@ const HandEventSchema: z.ZodType<HandEvent> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('decisionLocked'), seat: z.number().int() }),
   z.object({ type: z.literal('round1Resolved'), result: Round1ResultSchema }),
   z.object({ type: z.literal('finalStarted'), table: z.array(CardSchema) }),
-  z.object({ type: z.literal('castLocked'), seat: z.number().int() }),
   z.object({ type: z.literal('betPlaced'), seat: z.number().int(), kind: z.enum(BET_KINDS), amount: z.number().int() }),
   z.object({ type: z.literal('handEnded'), result: FinalResultSchema }),
 ]);
 
 const HandViewSchema: z.ZodType<HandView> = z.object({
-  phase: z.enum(['decide', 'round1End', 'cast', 'bet', 'reveal', 'done']),
+  phase: z.enum(['decide', 'round1End', 'bet', 'reveal', 'done']),
   button: z.number().int(),
   round1Pot: z.number().int(),
   finalPot: z.number().int(),
@@ -131,7 +128,6 @@ const HandViewSchema: z.ZodType<HandView> = z.object({
       decided: z.boolean(),
       stayed: z.boolean().nullable(),
       shown: CardSchema.nullable(),
-      castLocked: z.boolean(),
       folded: z.boolean(),
       committed: z.number().int(),
       roundCommitted: z.number().int(),
@@ -153,11 +149,10 @@ const HandViewSchema: z.ZodType<HandView> = z.object({
       seat: z.number().int(),
       hand: z.array(CardSchema),
       decision: DecisionSchema.nullable(),
-      pendingCast: CardSchema.nullable(),
       canDecide: z.boolean(),
-      canCast: z.boolean(),
       legalBets: z.array(z.enum(BET_KINDS)),
       options: z.array(z.object({ card: CardSchema, combination: CombinationSchema })),
+      best: CombinationSchema.nullable(),
     })
     .nullable(),
 });
@@ -194,8 +189,8 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('leave') }),
   z.object({ type: z.literal('addBot') }),
   z.object({ type: z.literal('decide'), decision: DecisionSchema }),
-  z.object({ type: z.literal('cast'), card: CardSchema }),
   z.object({ type: z.literal('bet'), kind: z.enum(BET_KINDS) }),
+  z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(200) }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
@@ -204,6 +199,8 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('lobby'), tables: z.array(LobbyTableSchema) }),
   z.object({ type: z.literal('table'), view: TableViewSchema, events: z.array(HandEventSchema) }),
   z.object({ type: z.literal('left') }),
+  // Table chat: relayed by the tables to every human seat, bots never speak.
+  z.object({ type: z.literal('chat'), from: z.string(), playerId: z.string(), text: z.string() }),
   z.object({ type: z.literal('error'), reason: z.enum(SERVER_ERRORS) }),
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;

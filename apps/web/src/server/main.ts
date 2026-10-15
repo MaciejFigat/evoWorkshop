@@ -1,4 +1,6 @@
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { loadEnvFile } from 'node:process';
 import { DEFAULT_TABLE } from '@evo/alchemy-brawl/engine';
 import { Lobby } from '@evo/alchemy-brawl/tables';
 import { Lobby as PhlebasLobby } from '@evo/project-phlebas-coop/logic';
@@ -7,8 +9,15 @@ import { createApp } from './app.ts';
 import { scanGames, type Catalog } from './catalog.ts';
 import { distFrontend, viteFrontend, type Frontend } from './frontend.ts';
 
-const PORT = Number(process.env.PORT ?? 5180);
 const repo = resolve(import.meta.dirname, '../../../..');
+
+// Loaded here rather than with --env-file: that flag makes Node's --watch restart in a loop.
+const envFile = resolve(repo, '.env');
+if (existsSync(envFile)) {
+  loadEnvFile(envFile);
+}
+
+const PORT = Number(process.env.PORT ?? 5180);
 const mode = process.env.NODE_ENV === 'production' ? 'dist' : 'dev';
 const dev = mode === 'dev';
 

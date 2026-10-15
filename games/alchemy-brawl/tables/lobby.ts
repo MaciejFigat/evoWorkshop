@@ -89,9 +89,10 @@ export class Lobby {
       case 'addBot':
         return player.table === null ? 'not_seated' : this.afterChange(player.table.addBot());
       case 'decide':
-      case 'cast':
       case 'bet':
         return player.table === null ? 'not_seated' : player.table.act(player.id, message);
+      case 'chat':
+        return player.table === null ? 'not_seated' : player.table.chat(player.id, message.text);
     }
   }
 

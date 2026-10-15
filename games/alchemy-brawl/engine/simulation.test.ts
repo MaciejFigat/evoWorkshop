@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fullDeck, type Card } from './cards.ts';
 import { DEFAULT_RULES } from './config.ts';
 import { legalBets, startHand, step } from './hand.ts';
-import { bestCombination, compareCombinations } from './scoring.ts';
+import { bestCombination, bestOfCards, compareCombinations, winnersOf } from './scoring.ts';
 import {
   CATEGORIES,
   type Category,
@@ -11,19 +11,37 @@ import {
   type Decision,
   type HandAction,
   type HandState,
+  type SeatCombination,
 } from './types.ts';
 
 const SAMPLES = 40_000;
 const TOLERANCE = 1.0;
+const SEED = 2026;
 
-// Spec §8, "player's best", in percent.
-const SPEC: Record<string, Record<Category, number>> = {
-  'table 2, hand 3': { straightFlush: 0.6, three: 0.7, straight: 7.9, flush: 11.5, pair: 30.8, high: 48.5 },
-  'table 3, hand 3': { straightFlush: 1.8, three: 2.1, straight: 20.2, flush: 24.7, pair: 31.2, high: 20.1 },
-  'table 3, hand 4': { straightFlush: 2.4, three: 2.7, straight: 25.0, flush: 27.3, pair: 29.6, high: 13.0 },
+type Odds = Record<Category, number>;
+
+// Spec §8, "player's best", in percent. Round 1: the best shown card with both table cards.
+const ROUND1_SPEC: Odds = { straightFlush: 0.6, three: 0.7, straight: 7.9, flush: 11.5, pair: 30.8, high: 48.5 };
+
+// Spec §8, "player's best", in percent. Final: the best three among the four-card hand and the three table cards.
+const FINAL_SPEC: Odds = { straightFlush: 6.5, three: 7.5, straight: 43.1, flush: 34.9, pair: 7.2, high: 0.8 };
+
+// Spec §8, "wins the round", in percent, with all 6 players revealing their best, plus the share of
+// rounds where the win is an exact tie.
+const WINS_SEATS = 6;
+type RoundOdds = { winner: Odds; ties: number };
+const ROUND1_WINS: RoundOdds = {
+  winner: { straightFlush: 3.3, three: 3.6, straight: 21.7, flush: 17.4, pair: 51.4, high: 2.7 },
+  ties: 31.8,
+};
+const FINAL_WINS: RoundOdds = {
+  winner: { straightFlush: 32.4, three: 25.8, straight: 41.0, flush: 0.9, pair: 0.0, high: 0.0 },
+  ties: 13.0,
 };
 
-function bestOfHand(hand: Card[], table: Card[]): Category {
+type Best = (hand: Card[], table: Card[]) => Combination;
+
+const bestShown: Best = (hand, table) => {
   let best: Combination | null = null;
   for (const card of hand) {
     const candidate = bestCombination(card, table);
@@ -34,31 +52,97 @@ function bestOfHand(hand: Card[], table: Card[]): Category {
   if (best === null) {
     throw new Error('empty hand');
   }
-  return best.category;
+  return best;
+};
+
+const bestOfAll: Best = (hand, table) => {
+  const best = bestOfCards([...hand, ...table]);
+  if (best === null) {
+    throw new Error('fewer than three cards');
+  }
+  return best;
+};
+
+function emptyOdds(): Odds {
+  return { high: 0, pair: 0, flush: 0, straight: 0, three: 0, straightFlush: 0 };
+}
+
+function toPercent(counts: Odds): Odds {
+  const odds = emptyOdds();
+  for (const category of CATEGORIES) {
+    odds[category] = (counts[category] / SAMPLES) * 100;
+  }
+  return odds;
+}
+
+function measure(tableSize: number, handSize: number, best: Best): Odds {
+  const deck = fullDeck();
+  const rng = mulberry32(SEED);
+  const counts = emptyOdds();
+  for (let i = 0; i < SAMPLES; i += 1) {
+    const shuffled = rng.shuffle(deck);
+    const table = shuffled.slice(0, tableSize);
+    const hand = shuffled.slice(tableSize, tableSize + handSize);
+    counts[best(hand, table).category] += 1;
+  }
+  return toPercent(counts);
+}
+
+function measureWins(tableSize: number, handSize: number, best: Best): RoundOdds {
+  const deck = fullDeck();
+  const rng = mulberry32(SEED);
+  const counts = emptyOdds();
+  let ties = 0;
+  for (let i = 0; i < SAMPLES; i += 1) {
+    const shuffled = rng.shuffle(deck);
+    const table = shuffled.slice(0, tableSize);
+    const entries: SeatCombination[] = Array.from({ length: WINS_SEATS }, (_, seat) => {
+      const from = tableSize + seat * handSize;
+      return { seat, combination: best(shuffled.slice(from, from + handSize), table) };
+    });
+    const winners = winnersOf(entries);
+    const winner = entries.find((entry) => entry.seat === winners[0]);
+    if (winner === undefined) {
+      throw new Error('round without a winner');
+    }
+    counts[winner.combination.category] += 1;
+    if (winners.length > 1) {
+      ties += 1;
+    }
+  }
+  return { winner: toPercent(counts), ties: (ties / SAMPLES) * 100 };
+}
+
+function expectOdds(measured: Odds, expected: Odds): void {
+  for (const category of CATEGORIES) {
+    const percent = measured[category];
+    expect(Math.abs(percent - expected[category]), `${category}: ${percent.toFixed(2)}%`).toBeLessThan(TOLERANCE);
+  }
+}
+
+function expectWins(measured: RoundOdds, expected: RoundOdds): void {
+  expectOdds(measured.winner, expected.winner);
+  expect(Math.abs(measured.ties - expected.ties), `ties: ${measured.ties.toFixed(2)}%`).toBeLessThan(TOLERANCE);
 }
 
 describe("player's best combination odds (spec §8)", () => {
-  const deck = fullDeck();
-  for (const [label, expected] of Object.entries(SPEC)) {
-    const [tableSize, handSize] = label.match(/\d+/g)?.map(Number) ?? [];
-    it(`matches the spec table for ${label}`, () => {
-      if (tableSize === undefined || handSize === undefined) {
-        throw new Error(`bad label ${label}`);
-      }
-      const rng = mulberry32(2026);
-      const counts: Record<Category, number> = { high: 0, pair: 0, flush: 0, straight: 0, three: 0, straightFlush: 0 };
-      for (let i = 0; i < SAMPLES; i += 1) {
-        const shuffled = rng.shuffle(deck);
-        const table = shuffled.slice(0, tableSize);
-        const hand = shuffled.slice(tableSize, tableSize + handSize);
-        counts[bestOfHand(hand, table)] += 1;
-      }
-      for (const category of CATEGORIES) {
-        const percent = (counts[category] / SAMPLES) * 100;
-        expect(Math.abs(percent - expected[category]), `${category}: ${percent.toFixed(2)}%`).toBeLessThan(TOLERANCE);
-      }
-    });
-  }
+  it('matches the spec table for Round 1, table 2, hand 3', () => {
+    expectOdds(measure(2, 3, bestShown), ROUND1_SPEC);
+  });
+
+  it('matches the spec table for the Final, table 3, hand 4', () => {
+    expectOdds(measure(3, 4, bestOfAll), FINAL_SPEC);
+  });
+});
+
+describe('winning combination odds at 6 players (spec §8)', () => {
+  it('matches the spec table for Round 1, every player showing their best card', () => {
+    expectWins(measureWins(2, 3, bestShown), ROUND1_WINS);
+  });
+
+  it('matches the spec table for the Final, every player holding 4 cards', () => {
+    expectWins(measureWins(3, 4, bestOfAll), FINAL_WINS);
+  });
 });
 
 const SEATS = 6;
@@ -79,12 +163,10 @@ function pick<T>(rng: { int(min: number, max: number): number }, items: T[]): T 
 }
 
 function randomDecision(rng: { next(): number; int(min: number, max: number): number }, hand: Card[]): Decision {
-  if (rng.next() < 0.5 || hand.length < 2) {
+  if (rng.next() < 0.5 || hand.length === 0) {
     return { kind: 'skip' };
   }
-  const cast = pick(rng, hand);
-  const show = pick(rng, hand.filter((c) => c !== cast));
-  return { kind: 'stay', cast, show };
+  return { kind: 'stay', show: pick(rng, hand) };
 }
 
 function randomAction(rng: { next(): number; int(min: number, max: number): number }, state: HandState): HandAction {
@@ -97,14 +179,6 @@ function randomAction(rng: { next(): number; int(min: number, max: number): numb
       const seats = state.players.flatMap((p, seat) => (p.decision === null ? [seat] : []));
       const seat = pick(rng, seats);
       return { type: 'decide', seat, decision: randomDecision(rng, state.players[seat]?.hand ?? []) };
-    }
-    case 'cast': {
-      if (timeout) {
-        return { type: 'timeout' };
-      }
-      const seats = state.players.flatMap((p, seat) => (!p.folded && p.pendingCast === null ? [seat] : []));
-      const seat = pick(rng, seats);
-      return { type: 'cast', seat, card: pick(rng, state.players[seat]?.hand ?? []) };
     }
     case 'bet': {
       const seat = state.betting?.toAct[0];
@@ -151,6 +225,13 @@ describe('random play', () => {
         }
       }
       expect(state.final).not.toBeNull();
+      if (state.final?.reason === 'showdown') {
+        expect(state.final.hands.length).toBeGreaterThanOrEqual(2);
+        expect(state.final.combinations.length).toBe(state.final.hands.length);
+      } else {
+        expect(state.final?.hands).toEqual([]);
+      }
+      expect(state.players.every((p) => p.hand.length === 4)).toBe(true);
       expect(state.round1Pot + state.finalPot).toBe(0);
       expect(chips(state)).toBe(total);
     }

@@ -42,8 +42,8 @@ export function rankThree(a: Card, b: Card, c: Card): Combination {
   return make('high', cards, [p0, p1, p2]);
 }
 
-// The cast with the best two of the table cards.
-export function bestCombination(cast: Card, table: Card[]): Combination {
+// Round 1: the shown card with the two table cards (the best two, if more are given). The shown card comes first.
+export function bestCombination(shown: Card, table: Card[]): Combination {
   let best: Combination | null = null;
   for (let i = 0; i < table.length; i += 1) {
     for (let j = i + 1; j < table.length; j += 1) {
@@ -52,13 +52,38 @@ export function bestCombination(cast: Card, table: Card[]): Combination {
       if (first === undefined || second === undefined) {
         continue;
       }
-      const candidate = rankThree(cast, first, second);
+      const candidate = rankThree(shown, first, second);
       if (best === null || compareCombinations(candidate, best) > 0) {
         best = candidate;
       }
     }
   }
-  return best ?? make('high', [cast], [cast.power]);
+  return best ?? make('high', [shown], [shown.power]);
+}
+
+// The Final: the best three cards among everything the player can use, hand and table together,
+// so the board alone may play. Null with fewer than three cards. The three cards come out highest
+// power first, so the text helpers read the way the spec writes combinations (10-6-5).
+export function bestOfCards(cards: Card[]): Combination | null {
+  const sorted = [...cards].sort((x, y) => y.power - x.power);
+  let best: Combination | null = null;
+  for (let i = 0; i < sorted.length; i += 1) {
+    for (let j = i + 1; j < sorted.length; j += 1) {
+      for (let k = j + 1; k < sorted.length; k += 1) {
+        const first = sorted[i];
+        const second = sorted[j];
+        const third = sorted[k];
+        if (first === undefined || second === undefined || third === undefined) {
+          continue;
+        }
+        const candidate = rankThree(first, second, third);
+        if (best === null || compareCombinations(candidate, best) > 0) {
+          best = candidate;
+        }
+      }
+    }
+  }
+  return best;
 }
 
 // Positive when a beats b, zero when they split.

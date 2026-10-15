@@ -1,8 +1,6 @@
 import {
   CATEGORY_RANK,
   compareCombinations,
-  lowestCard,
-  sameCard,
   type BetKind,
   type Card,
   type CardOption,
@@ -12,7 +10,7 @@ import {
 } from '@evo/alchemy-brawl/engine';
 import type { Rng } from '@evo/rng';
 
-export type BotMove = { type: 'decide'; decision: Decision } | { type: 'cast'; card: Card } | { type: 'bet'; kind: BetKind };
+export type BotMove = { type: 'decide'; decision: Decision } | { type: 'bet'; kind: BetKind };
 
 const BLUFF_STAY_RATE = 0.2;
 const MEDIUM_BET_RATE = 0.5;
@@ -28,38 +26,30 @@ export function chooseBotMove(view: HandView, rng: Rng): BotMove | null {
   if (you.canDecide) {
     return { type: 'decide', decision: decide(you, rng) };
   }
-  if (you.canCast) {
-    const best = bestOption(you.options);
-    return best === null ? null : { type: 'cast', card: best.card };
-  }
   if (you.legalBets.length > 0) {
     return bet(you, rng);
   }
   return null;
 }
 
+// Round 1: show the card that makes the best combination with the table when it is a pair or
+// better; otherwise bluff-stay now and then with the highest card, else skip.
 function decide(you: YouView, rng: Rng): Decision {
   const best = bestOption(you.options);
   if (best !== null && CATEGORY_RANK[best.combination.category] >= CATEGORY_RANK.pair) {
-    return stay(you.hand, best.card);
+    return { kind: 'stay', show: best.card };
   }
-  const lowest = lowestCard(you.hand);
-  if (lowest !== null && rng.next() < BLUFF_STAY_RATE) {
-    return stay(you.hand, lowest);
+  const highest = highestCard(you.hand);
+  if (highest !== null && rng.next() < BLUFF_STAY_RATE) {
+    return { kind: 'stay', show: highest };
   }
   return { kind: 'skip' };
 }
 
-function stay(hand: Card[], cast: Card): Decision {
-  const show = highestCard(hand.filter((card) => !sameCard(card, cast)));
-  return show === null ? { kind: 'skip' } : { kind: 'stay', cast, show };
-}
-
+// The Final: strength is the best three among the hand and the table, as the showdown scores it.
 function bet(you: YouView, rng: Rng): BotMove | null {
   const legal = you.legalBets;
-  const pending = you.pendingCast;
-  const option = pending === null ? undefined : you.options.find((o) => sameCard(o.card, pending));
-  const strength = option === undefined ? CATEGORY_RANK.high : CATEGORY_RANK[option.combination.category];
+  const strength = you.best === null ? CATEGORY_RANK.high : CATEGORY_RANK[you.best.category];
   const pick = (...preferred: BetKind[]): BotMove | null => {
     const kind = preferred.find((k) => legal.includes(k));
     return kind === undefined ? null : { type: 'bet', kind };
