@@ -47,6 +47,7 @@
         }
         this.loadStage(0);
         this.scene = 'title';
+        if (location.hash === '#play') this.startRun();     // index.html#play skips the title screen
       } catch (e) {
         this.fail(e);
       }
@@ -67,15 +68,15 @@
 
     /* ---------------- run setup ---------------- */
 
-    // One run = one round for the playground telemetry: reported once, when it ends.
-    endRun(result) {
-      if (WS.onRun) WS.onRun({ result, score: this.score, stage: this.stageIdx + 1, lives: this.lives });
-    }
-
     startRun() {
       this.score = 0;
       this.lives = 3;
       this.startStage(0);
+    }
+
+    // One run = one round for the playground telemetry: reported once, when it ends.
+    endRun(result) {
+      if (WS.onRun) WS.onRun({ result, score: this.score, stage: this.stageIdx + 1, lives: this.lives });
     }
 
     startStage(idx) {
