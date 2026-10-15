@@ -18,4 +18,11 @@
   --element-air: #d9d3b6;
   --font-display: 'Cinzel', serif;
   --font-body: 'Alegreya Sans', sans-serif;
+  /* The side panels follow the Evolution UI Kit: Inter on black glass, the game's own accents. */
+  --font-ui: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --glass: rgba(0, 0, 0, 0.75);
+  --glass-head: rgba(255, 255, 255, 0.1);
+  --control: rgba(26, 26, 26, 0.6);
+  --phase-round1: var(--element-earth);
+  --phase-final: var(--gold-light);
 }
